@@ -1,4 +1,4 @@
-# Copyright 2018 Uber Technologies, Inc. All Rights Reserved.
+# Copyright (c) 2019 Uber Technologies, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,26 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+#
+# ReadTheDocs.io build configuration: supply addition pip install options
+#
+version: 2
 
-import hashlib
-import os
-import socket
+# Sphinx configuration
+sphinx:
+  configuration: docs/conf.py
+  fail_on_warning: true
 
+# Don't build any extra formats
+formats: []
 
-NAMESPACE_PATH = '/proc/self/ns'
-
-
-def _namespaces():
-    hash = ''
-    if os.path.exists(NAMESPACE_PATH):
-        for file in os.listdir(NAMESPACE_PATH):
-            if hash != '':
-                hash += ' '
-            hash += os.readlink(os.path.join(NAMESPACE_PATH, file))
-    return hash
-
-
-def host_hash():
-    hostname = socket.gethostname()
-    ns = _namespaces()
-    return '%s-%s' % (hostname, hashlib.md5(ns.encode('ascii')).hexdigest())
+# Requirements for building docs
+python:
+  version: 3.7
+  install:
+    - requirements: docs/requirements.txt

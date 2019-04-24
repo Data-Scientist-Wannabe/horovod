@@ -1,6 +1,6 @@
 # Horovod
 
-[![Build Status](https://travis-ci.org/horovod/horovod.svg?branch=master)](https://travis-ci.org/horovod/horovod) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fuber%2Fhorovod.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fuber%2Fhorovod?ref=badge_shield) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2373/badge)](https://bestpractices.coreinfrastructure.org/projects/2373) [![Downloads](https://pepy.tech/badge/horovod)](https://pepy.tech/project/horovod)
+[![Build Status](https://badge.buildkite.com/6f976bc161c69d9960fc00de01b69deb6199b25680a09e5e26.svg?branch=master)](https://buildkite.com/horovod/horovod) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fhorovod%2Fhorovod.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fhorovod%2Fhorovod?ref=badge_shield) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2373/badge)](https://bestpractices.coreinfrastructure.org/projects/2373) [![Downloads](https://pepy.tech/badge/horovod)](https://pepy.tech/project/horovod)
 
 <p align="center"><img src="https://user-images.githubusercontent.com/16640218/34506318-84d0c06c-efe0-11e7-8831-0425772ed8f2.png" alt="Logo" width="200"/></p>
 
@@ -164,28 +164,18 @@ page for more instructions, including RoCE/InfiniBand tweaks and tips for dealin
 1. To run on a machine with 4 GPUs:
 
 ```bash
-$ mpirun -np 4 \
-    -H localhost:4 \
-    -bind-to none -map-by slot \
-    -x NCCL_DEBUG=INFO -x LD_LIBRARY_PATH -x PATH \
-    -mca pml ob1 -mca btl ^openib \
-    python train.py
+$ horovodrun -np 4 -H localhost:4 python train.py
 ```
 
 2. To run on 4 machines with 4 GPUs each:
 
 ```bash
-$ mpirun -np 16 \
-    -H server1:4,server2:4,server3:4,server4:4 \
-    -bind-to none -map-by slot \
-    -x NCCL_DEBUG=INFO -x LD_LIBRARY_PATH -x PATH \
-    -mca pml ob1 -mca btl ^openib \
-    python train.py
+$ horovodrun -np 16 -H server1:4,server2:4,server3:4,server4:4 python train.py
 ```
 
 3. To run in Docker, see the [Horovod in Docker](docs/docker.md) page.
 
-4. To run in Kubernetes, see [Kubeflow](https://github.com/kubeflow/kubeflow/blob/master/kubeflow/openmpi/),
+4. To run in Kubernetes, see [Kubeflow](https://github.com/kubeflow/kubeflow/tree/master/kubeflow/mpi-job),
 [MPI Operator](https://github.com/kubeflow/mpi-operator/), 
 [Helm Chart](https://github.com/kubernetes/charts/tree/master/stable/horovod/), and 
 [FfDL](https://github.com/IBM/FfDL/tree/master/etc/examples/horovod/).
@@ -212,12 +202,12 @@ See a full training [example](examples/tensorflow_mnist_estimator.py).
 
 Horovod supports MXNet and regular TensorFlow in similar ways.
 
-See full training [MNIST](examples/mxnet_mnist.py) and [ImageNet](examples/mxnet_imagenet_resnet50.py) examples.
+See full training [MNIST](examples/mxnet_mnist.py) and [ImageNet](examples/mxnet_imagenet_resnet50.py) examples. The script below provides a simple skeleton of code block based on MXNet Gluon API.
 
 ```python
 import mxnet as mx
 import horovod.mxnet as hvd
-from mxnet import autograd, gluon
+from mxnet import autograd
 
 # Initialize Horovod
 hvd.init()
@@ -230,12 +220,9 @@ num_workers = hvd.size()
 model = ...
 model.hybridize()
 
-# Define hyper parameters
+# Create optimizer
 optimizer_params = ...
-
-# Add Horovod Distributed Optimizer
 opt = mx.optimizer.create('sgd', **optimizer_params)
-opt = hvd.DistributedOptimizer(opt)
 
 # Initialize parameters
 model.initialize(initializer, ctx=context)
@@ -245,8 +232,10 @@ params = model.collect_params()
 if params is not None:
     hvd.broadcast_parameters(params, root_rank=0)
 
-# Create trainer and loss function
-trainer = gluon.Trainer(params, opt, kvstore=None)
+# Create DistributedTrainer, a subclass of gluon.Trainer
+trainer = hvd.DistributedTrainer(params, opt)
+
+# Create loss function
 loss_fn = ...
 
 # Train model

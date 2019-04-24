@@ -1,4 +1,4 @@
-# Copyright 2018 Uber Technologies, Inc. All Rights Reserved.
+# Copyright 2019 Uber Technologies, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +13,23 @@
 # limitations under the License.
 # ==============================================================================
 
-import cloudpickle
-from six.moves import queue, socketserver
-import psutil
 import random
 import socket
 import struct
 import threading
+import cloudpickle
+import psutil
 
-from horovod.spark.util import secret
+from six.moves import queue, socketserver
+
+from horovod.run.common.util import secret
 
 
 class PingRequest(object):
+    pass
+
+
+class NoValidAddressesFound(Exception):
     pass
 
 
@@ -140,10 +145,15 @@ class BasicService(object):
         self._server.server_close()
         self._thread.join()
 
+    def get_port(self):
+        return self._port
+
 
 class BasicClient(object):
-    def __init__(self, service_name, addresses, key, match_intf=False, probe_timeout=20, retries=3):
+    def __init__(self, service_name, addresses, key, verbose, match_intf=False,
+                 probe_timeout=20, retries=3):
         # Note: because of retry logic, ALL RPC calls are REQUIRED to be idempotent.
+        self._verbose = verbose
         self._service_name = service_name
         self._wire = Wire(key)
         self._match_intf = match_intf
@@ -151,8 +161,18 @@ class BasicClient(object):
         self._retries = retries
         self._addresses = self._probe(addresses)
         if not self._addresses:
-            raise Exception('Unable to connect to the %s on any of the addresses: %s'
-                            % (service_name, addresses))
+            raise NoValidAddressesFound(
+                'Horovodrun was unable to connect to {service_name} on any '
+                'of the following addresses: {addresses}.\n\n'
+                'One possible cause of this problem is that '
+                'horovodrun currently requires every host to have at '
+                'least one routable network interface with the same '
+                'name across all of the hosts. '
+                'You can run \"ifconfig -a\" '
+                'on every host and check for the common '
+                'routable interface. '
+                'To fix the problem, you can rename interfaces on '
+                'Linux.'.format(service_name=service_name, addresses=addresses))
 
     def _probe(self, addresses):
         result_queue = queue.Queue()
@@ -195,6 +215,24 @@ class BasicClient(object):
                                              for x in psutil.net_if_addrs().get(intf, [])
                                              if x.family == socket.AF_INET]
                         if resp.source_address not in client_intf_addrs:
+                            if self._verbose >= 2:
+                                # Need to find the local interface name whose
+                                # adderss was visible to the target
+                                # host's server.
+                                resp_intf = ''
+                                for key in psutil.net_if_addrs().keys():
+                                    key_intf_addrs = [x.address
+                                                      for x in psutil.net_if_addrs().get(key, [])]
+                                    if resp.source_address in key_intf_addrs:
+                                        resp_intf = key
+                                        break
+                                print('WARNING: Expected to connect the host '
+                                      '{addr} using interface '
+                                      '{intf}, but reached it on interface '
+                                      '{resp_intf}.'.format(
+                                    addr=str(addr[0])+':'+str(addr[1]),
+                                    intf=intf,
+                                    resp_intf=resp_intf))
                             return
                     result_queue.put((intf, addr))
                     return

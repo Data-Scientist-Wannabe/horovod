@@ -1,4 +1,4 @@
-# Copyright 2018 Uber Technologies, Inc. All Rights Reserved.
+# Copyright 2019 Uber Technologies, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,24 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 
-import hashlib
-import hmac
-import os
+import base64
+import cloudpickle
 
 
-SECRET_LENGTH = 32  # bytes
-DIGEST_LENGTH = 32  # bytes
-HOROVOD_SECRET_KEY = '_HOROVOD_SECRET_KEY'
+def loads_base64(encoded):
+    decoded = base64.b64decode(encoded)
+    return cloudpickle.loads(decoded)
 
 
-def make_secret_key():
-    return os.urandom(SECRET_LENGTH)
-
-
-def compute_digest(key, message):
-    return hmac.new(key, message, hashlib.sha256).digest()
-
-
-def check_digest(key, message, digest):
-    computed_digest = compute_digest(key, message)
-    return hmac.compare_digest(computed_digest, digest)
+def dumps_base64(obj):
+    serialized = cloudpickle.dumps(obj)
+    return base64.b64encode(serialized).decode('ascii')
