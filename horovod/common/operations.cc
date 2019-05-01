@@ -41,6 +41,7 @@
 #include "parameter_manager.h"
 #include "timeline.h"
 #include "logging.h"
+#include "common.h"
 
 #if HAVE_CUDA
 #include "ops/cuda_operations.h"
@@ -1596,6 +1597,7 @@ extern "C" {
 
 void horovod_init(const int* ranks, int nranks) {
   InitializeHorovodOnce(ranks, nranks);
+  
 }
 
 void horovod_init_comm(MPI_Comm comm) {
@@ -1610,6 +1612,13 @@ void horovod_shutdown() {
     // Reset the initialization flag to allow restarting with horovod_init(...)
     horovod_global.initialize_flag.clear();
     horovod_global.shut_down = false;
+    printf("Counter all reduce: %d\n",horovod_global.counter_allreduce);
+
+    std::map<int,int>::iterator itr;
+    for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\n'; 
+    }
   }
 }
 

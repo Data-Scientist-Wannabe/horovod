@@ -19,6 +19,7 @@
 
 #include <queue>
 #include <thread>
+#include <map>
 
 #include "fusion_buffer_manager.h"
 #include "parameter_manager.h"
@@ -107,6 +108,10 @@ struct HorovodGlobalState {
   bool mpi_threads_supported = false;
   bool is_homogeneous = false;
   std::vector<int> ranks;
+
+  int counter_allreduce=0;
+  std::map <int,int> map_allreduce;
+
 
   // COMM_WORLD ranks of processes running on this node.
   std::vector<int> local_comm_ranks;

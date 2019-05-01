@@ -54,6 +54,18 @@ Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const 
   timeline.ActivityStartAll(entries, MPI_ALLREDUCE);
   const void* sendbuf = entries.size() > 1 || first_entry.tensor->data() == first_entry.output->data()
                         ? MPI_IN_PLACE : first_entry.tensor->data();
+
+  global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
+  std::map<int,int>::iterator it;
+
+  it = global_state_->map_allreduce.find((int) num_elements);
+  if (it == global_state_->map_allreduce.end()){
+        global_state_->map_allreduce[(int)num_elements]=1;
+    }
+  else{
+    global_state_->map_allreduce[(int)num_elements]=global_state_->map_allreduce[(int)num_elements]+1;
+  }
+
   int op = MPI_Allreduce(sendbuf, buffer_data,
                          (int) num_elements,
                          mpi_context_->GetMPIDataType(first_entry.tensor),
