@@ -43,6 +43,7 @@
 #include "logging.h"
 #include "common.h"
 #include <fstream>
+#include <chrono>
 
 #if HAVE_CUDA
 #include "ops/cuda_operations.h"
@@ -95,7 +96,10 @@ std::ofstream myfile;
 
 
 BcastState bcast_state;
-
+int size_mpi,size_msg;
+auto start_prof = std::chrono::high_resolution_clock::now();
+auto stop_prof = std::chrono::high_resolution_clock::now();
+auto duration_prof = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof - start_prof); 
 
 MPIContext mpi_context;
 
@@ -203,6 +207,10 @@ void write_to_file()
 
   printf("Counter all reduce: %d\n",horovod_global.counter_allreduce);
   myfile << "Counter all reduce: " << horovod_global.counter_allreduce << "\n";
+
+  printf("Time all reduce: %d microseconds\n",horovod_global.time_allreduce);
+  myfile << "Time all reduce: " << horovod_global.time_allreduce << " microseconds"<< "\n";
+
   for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
@@ -211,6 +219,9 @@ void write_to_file()
 
   printf("Counter all reduce(response cache): %d\n",bcast_state.counter_allreduce);
   myfile << "Counter all reduce(response cache): " << bcast_state.counter_allreduce << "\n";
+
+  printf("Time all reduce(response cache): %d microseconds\n",bcast_state.time_allreduce);
+  myfile << "Time all reduce(response cache): " << bcast_state.time_allreduce << " microseconds"<< "\n";
   for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
@@ -219,6 +230,10 @@ void write_to_file()
 
   printf("Counter bcast: %d\n",horovod_global.counter_bcast);
   myfile << "Counter bcast: " << horovod_global.counter_bcast << "\n";
+
+  printf("Time Bcast: %d microseconds\n",horovod_global.time_bcast);
+  myfile << "Time Bcast: " << horovod_global.time_bcast << " microseconds"<< "\n";
+
   for (itr = horovod_global.map_bcast.begin(); itr != horovod_global.map_bcast.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
@@ -227,6 +242,10 @@ void write_to_file()
 
   printf("Counter all gather: %d\n",horovod_global.counter_allgather);
   myfile << "Counter all gather: " << horovod_global.counter_allgather << "\n";
+
+  printf("Time Allgather: %d microseconds\n",horovod_global.time_allgather);
+  myfile << "Time Allgather: " << horovod_global.time_allgather << " microseconds"<< "\n";
+
   for (itr = horovod_global.map_allgather.begin(); itr != horovod_global.map_allgather.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
@@ -235,6 +254,10 @@ void write_to_file()
 
   printf("Counter gather: %d\n",horovod_global.counter_gather);
   myfile << "Counter gather: " << horovod_global.counter_gather << "\n";
+
+  printf("Time gather: %d microseconds\n",horovod_global.time_gather);
+  myfile << "Time gather: " << horovod_global.time_gather << " microseconds"<< "\n";
+
   for (itr = horovod_global.map_gather.begin(); itr != horovod_global.map_gather.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
@@ -243,6 +266,10 @@ void write_to_file()
 
   printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
   myfile << "Counter gatherv: " << horovod_global.counter_gatherv << "\n";
+
+  printf("Time gatherv: %d microseconds\n",horovod_global.time_gatherv);
+  myfile << "Time gatherv: " << horovod_global.time_gatherv << " microseconds" << "\n";
+
   for (itr = horovod_global.map_gatherv.begin(); itr != horovod_global.map_gatherv.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
@@ -993,6 +1020,10 @@ void BackgroundThreadLoop(HorovodGlobalState& state, MPIContext& ctx) {
 
   horovod_global.counter_allgather = horovod_global.counter_allgather+ 1;
 
+  
+  
+
+
   it = horovod_global.map_allgather.find(0);
   if (it == horovod_global.map_allgather.end()){
         horovod_global.map_allgather[0]=1;
@@ -1001,23 +1032,39 @@ void BackgroundThreadLoop(HorovodGlobalState& state, MPIContext& ctx) {
       horovod_global.map_allgather[0]=horovod_global.map_allgather[0]+1;
    }
 
-  it = horovod_global.map_allgather.find(1);
+  MPI_Type_size(MPI_INT, &size_mpi);
+  size_msg = size_mpi * 1;
+
+  it = horovod_global.map_allgather.find(size_msg);
   if (it == horovod_global.map_allgather.end()){
-        horovod_global.map_allgather[1]=1;
+        horovod_global.map_allgather[size_msg]=1;
       }
   else{
-      horovod_global.map_allgather[1]=horovod_global.map_allgather[1]+1;
+      horovod_global.map_allgather[size_msg]=horovod_global.map_allgather[size_msg]+1;
    }
+  start_prof = std::chrono::high_resolution_clock::now();
   MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, local_comm_ranks.data(), 1,
                 MPI_INT, local_comm);
+
+  stop_prof = std::chrono::high_resolution_clock::now();
+  duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+  horovod_global.time_allgather = horovod_global.time_allgather + duration_prof.count();
+
+
 
   // Determine if cluster is homogeneous, i.e., if every node has the same
   // local_size
   auto local_sizes = new int[size];
 
   horovod_global.counter_allgather = horovod_global.counter_allgather+ 1;
+
+  start_prof = std::chrono::high_resolution_clock::now();
   MPI_Allgather(&local_size, 1, MPI_INT, local_sizes, 1, MPI_INT,
                 ctx.mpi_comm);
+
+  stop_prof = std::chrono::high_resolution_clock::now();
+  duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+  horovod_global.time_allgather = horovod_global.time_allgather + duration_prof.count();
 
   bool is_homogeneous = true;
   for (int i = 0; i < size; ++i) {
@@ -1490,15 +1537,22 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
 
     horovod_global.counter_gather = horovod_global.counter_gather + 1;
 
-    it = horovod_global.map_gather.find(1);
+    MPI_Type_size(MPI_INT, &size_mpi);
+    size_msg = size_mpi * 1;
+    it = horovod_global.map_gather.find(size_msg);
     if (it == horovod_global.map_gather.end()){
-          horovod_global.map_gather[1]=1;
+          horovod_global.map_gather[size_msg]=1;
         }
     else{
-        horovod_global.map_gather[1]=horovod_global.map_gather[1]+1;
+        horovod_global.map_gather[size_msg]=horovod_global.map_gather[size_msg]+1;
      }
+    start_prof = std::chrono::high_resolution_clock::now();
     MPI_Gather(MPI_IN_PLACE, 1, MPI_INT, recvcounts, 1, MPI_INT, RANK_ZERO,
                ctx.mpi_comm);
+
+    stop_prof = std::chrono::high_resolution_clock::now();
+    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+    horovod_global.time_gather = horovod_global.time_gather + duration_prof.count();
 
     // 2. Compute displacements.
     auto displcmnts = new int[state.size];
@@ -1516,15 +1570,23 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
     auto buffer = new uint8_t[total_size];
 
     horovod_global.counter_gatherv = horovod_global.counter_gatherv+ 1;
-    it = horovod_global.map_gatherv.find(0);
+
+    MPI_Type_size(MPI_BYTE, &size_mpi);
+    size_msg = size_mpi * 1;
+
+    it = horovod_global.map_gatherv.find(size_msg);
     if (it == horovod_global.map_gatherv.end()){
-          horovod_global.map_gatherv[0]=1;
+          horovod_global.map_gatherv[size_msg]=1;
         }
     else{
-        horovod_global.map_gatherv[0]=horovod_global.map_gatherv[0]+1;
+        horovod_global.map_gatherv[size_msg]=horovod_global.map_gatherv[size_msg]+1;
      }
+    start_prof = std::chrono::high_resolution_clock::now();
     MPI_Gatherv(nullptr, 0, MPI_BYTE, buffer, recvcounts, displcmnts, MPI_BYTE,
                 RANK_ZERO, ctx.mpi_comm);
+    stop_prof = std::chrono::high_resolution_clock::now();
+    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+    horovod_global.time_gatherv = horovod_global.time_gatherv + duration_prof.count();
 
     // 4. Process messages.
     for (int i = 1; i < state.size; ++i) {
@@ -1597,28 +1659,38 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
     //Profiler start
     horovod_global.counter_bcast = horovod_global.counter_bcast +2;
 
+    
+    MPI_Type_size(MPI_BYTE, &size_mpi);
+    size_msg = size_mpi * (int) encoded_response_length;
 
-    it = horovod_global.map_bcast.find((int) encoded_response_length);
+    it = horovod_global.map_bcast.find(size_msg);
     if (it == horovod_global.map_bcast.end()){
-          horovod_global.map_bcast[(int)encoded_response_length]=1;
+          horovod_global.map_bcast[size_msg]=1;
       }
     else{
-      horovod_global.map_bcast[(int)encoded_response_length]=horovod_global.map_bcast[(int)encoded_response_length]+1;
+      horovod_global.map_bcast[size_msg]=horovod_global.map_bcast[size_msg]+1;
     }
 
-    it = horovod_global.map_bcast.find(1);
+    MPI_Type_size(MPI_INT, &size_mpi);
+    size_msg = size_mpi * 1;
+
+    it = horovod_global.map_bcast.find(size_msg);
     if (it == horovod_global.map_bcast.end()){
-          horovod_global.map_bcast[1]=1;
+          horovod_global.map_bcast[size_msg]=1;
       }
     else{
-      horovod_global.map_bcast[1]=horovod_global.map_bcast[1]+1;
+      horovod_global.map_bcast[size_msg]=horovod_global.map_bcast[size_msg]+1;
     }
     //Profiler end
 
-    
+    start_prof = std::chrono::high_resolution_clock::now();
     MPI_Bcast(&encoded_response_length, 1, MPI_INT, RANK_ZERO, ctx.mpi_comm);
     MPI_Bcast((void*)encoded_response.c_str(), encoded_response_length,
               MPI_BYTE, RANK_ZERO, ctx.mpi_comm);
+
+    stop_prof = std::chrono::high_resolution_clock::now();
+    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+    horovod_global.time_bcast = horovod_global.time_bcast + duration_prof.count();
 
   } else {
     std::string encoded_message;
@@ -1633,55 +1705,80 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
 
     horovod_global.counter_gather = horovod_global.counter_gather + 1;
 
-    it = horovod_global.map_gather.find(1);
+    MPI_Type_size(MPI_INT, &size_mpi);
+    size_msg = size_mpi * 1;
+    it = horovod_global.map_gather.find(size_msg);
     if (it == horovod_global.map_gather.end()){
-          horovod_global.map_gather[1]=1;
+          horovod_global.map_gather[size_msg]=1;
         }
     else{
-        horovod_global.map_gather[1]=horovod_global.map_gather[1]+1;
+        horovod_global.map_gather[size_msg]=horovod_global.map_gather[size_msg]+1;
      }
 
+    start_prof = std::chrono::high_resolution_clock::now();
     MPI_Gather(&encoded_message_length, 1, MPI_INT, nullptr, 1, MPI_INT,
                RANK_ZERO, ctx.mpi_comm);
+    stop_prof = std::chrono::high_resolution_clock::now();
+    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+    horovod_global.time_gather = horovod_global.time_gather + duration_prof.count();
 
     horovod_global.counter_gatherv = horovod_global.counter_gatherv+ 1;
 
-    it = horovod_global.map_gatherv.find(encoded_message_length);
+    MPI_Type_size(MPI_BYTE, &size_mpi);
+    size_msg = size_mpi * encoded_message_length;
+    it = horovod_global.map_gatherv.find(size_msg);
     if (it == horovod_global.map_gatherv.end()){
-          horovod_global.map_gatherv[encoded_message_length]=1;
+          horovod_global.map_gatherv[size_msg]=1;
         }
     else{
-        horovod_global.map_gatherv[encoded_message_length]=horovod_global.map_gatherv[encoded_message_length]+1;
+        horovod_global.map_gatherv[size_msg]=horovod_global.map_gatherv[size_msg]+1;
      }
+    start_prof = std::chrono::high_resolution_clock::now();
     MPI_Gatherv((void*)encoded_message.c_str(), encoded_message_length,
                 MPI_BYTE, nullptr, nullptr, nullptr, MPI_BYTE, RANK_ZERO,
                 ctx.mpi_comm);
+    stop_prof = std::chrono::high_resolution_clock::now();
+    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+    horovod_global.time_gatherv = horovod_global.time_gatherv + duration_prof.count();
 
     int msg_length;
     horovod_global.counter_bcast = horovod_global.counter_bcast +2;
 
     //Profiler start
-    it = horovod_global.map_bcast.find((int) msg_length);
+    
+    MPI_Type_size(MPI_BYTE, &size_mpi);
+    size_msg = size_mpi * (int) msg_length;
+
+    it = horovod_global.map_bcast.find(size_msg);
     if (it == horovod_global.map_bcast.end()){
-          horovod_global.map_bcast[(int)msg_length]=1;
+          horovod_global.map_bcast[size_msg]=1;
       }
     else{
-      horovod_global.map_bcast[(int)msg_length]=horovod_global.map_bcast[(int)msg_length]+1;
+      horovod_global.map_bcast[size_msg]=horovod_global.map_bcast[size_msg]+1;
     }
 
-    it = horovod_global.map_bcast.find(1);
+    MPI_Type_size(MPI_INT, &size_mpi);
+    size_msg = size_mpi * 1;
+
+    it = horovod_global.map_bcast.find(size_msg);
     if (it == horovod_global.map_bcast.end()){
-          horovod_global.map_bcast[1]=1;
+          horovod_global.map_bcast[size_msg]=1;
       }
     else{
-      horovod_global.map_bcast[1]=horovod_global.map_bcast[1]+1;
+      horovod_global.map_bcast[size_msg]=horovod_global.map_bcast[size_msg]+1;
     }
+
     //Profiler end
 
-
+    start_prof = std::chrono::high_resolution_clock::now();
     MPI_Bcast(&msg_length, 1, MPI_INT, RANK_ZERO, ctx.mpi_comm);
     auto buffer = new uint8_t[msg_length];
     MPI_Bcast(buffer, msg_length, MPI_BYTE, RANK_ZERO, ctx.mpi_comm);
+
+    stop_prof = std::chrono::high_resolution_clock::now();
+    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
+    horovod_global.time_bcast = horovod_global.time_bcast + duration_prof.count();
+
     ResponseList::ParseFromBytes(response_list, buffer);
     delete[] buffer;
   }

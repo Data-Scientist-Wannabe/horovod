@@ -17,6 +17,7 @@
 #include "mpi_operations.h"
 #include "../common.h"
 #include <map>
+#include <chrono>
 namespace horovod {
 namespace common {
 
@@ -49,21 +50,29 @@ Status MPIAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Respo
 
   global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
   std::map<int,int>::iterator it;
+  int size_mpi,size_msg;
 
-  it = global_state_->map_allreduce.find((int) num_elements);
+
+  MPI_Type_size(mpi_context_->GetMPIDataType(first_entry.tensor), &size_mpi);
+  size_msg = size_mpi * (int)num_elements;
+  it = global_state_->map_allreduce.find(size_msg);
   if (it == global_state_->map_allreduce.end()){
-        global_state_->map_allreduce[(int)num_elements]=1;
+        global_state_->map_allreduce[size_msg]=1;
     }
   else{
-    global_state_->map_allreduce[(int)num_elements]=global_state_->map_allreduce[(int)num_elements]+1;
+    global_state_->map_allreduce[size_msg]=global_state_->map_allreduce[size_msg]+1;
   }
 
   //printf("counter %d\n",global_state_->counter_allreduce);
+  auto start = std::chrono::high_resolution_clock::now();
   int op = MPI_Allreduce(sendbuf, buffer_data,
                          (int) num_elements,
                          mpi_context_->GetMPIDataType(first_entry.tensor),
                          mpi_context_->GetMPISumOp(first_entry.tensor->dtype()),
                          mpi_context_->GetMPICommunicator(Communicator::GLOBAL));
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+  global_state_->time_allreduce = global_state_->time_allreduce + duration.count();
   if (op != MPI_SUCCESS) {
     throw std::logic_error("MPI_Allreduce failed, see MPI output for details.");
   }
@@ -360,20 +369,32 @@ Status MPIBroadcast::Execute(std::vector<TensorTableEntry>& entries, const Respo
   global_state_->timeline.ActivityStartAll(entries, MPI_BCAST);
   global_state_->counter_bcast = global_state_->counter_bcast +1;
 
+
   std::map<int,int>::iterator it;
   int temp_prof = (int) e.tensor->shape().num_elements();
-  it = global_state_->map_bcast.find(temp_prof);
+
+  int size_mpi,size_msg;
+
+
+  MPI_Type_size(mpi_context_->GetMPIDataType(e.tensor->dtype()), &size_mpi);
+  size_msg = size_mpi * temp_prof;
+
+  it = global_state_->map_bcast.find(size_msg);
   if (it == global_state_->map_bcast.end()){
-        global_state_->map_bcast[temp_prof]=1;
+        global_state_->map_bcast[size_msg]=1;
     }
   else{
-    global_state_->map_bcast[temp_prof]=global_state_->map_bcast[(int)temp_prof]+1;
+    global_state_->map_bcast[size_msg]=global_state_->map_bcast[size_msg]+1;
   }
+  auto start = std::chrono::high_resolution_clock::now();
   int op = MPI_Bcast(data_ptr,
                      (int) e.tensor->shape().num_elements(),
                      mpi_context_->GetMPIDataType(e.tensor->dtype()),
                      e.root_rank,
                      mpi_context_->GetMPICommunicator(Communicator::GLOBAL));
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+  global_state_->time_bcast = global_state_->time_bcast + duration.count();
   if (op != MPI_SUCCESS) {
     throw std::logic_error("MPI_Broadcast failed, see MPI output for details.");
   }

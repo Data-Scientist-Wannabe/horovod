@@ -11,6 +11,8 @@ struct BcastState{
 
       std::map <int,int> map_allreduce;
       std::map <int,int> map_bcast;
+
+      int time_allreduce;
 };
 
 }

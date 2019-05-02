@@ -17,6 +17,7 @@
 #include<cstring>
 
 #include "logging.h"
+#include <chrono>
 #include "response_cache.h"
 
 namespace horovod {
@@ -352,15 +353,25 @@ void CacheCoordinator::sync(MPIContext& ctx, bool timeline_enabled,BcastState* b
   // Global MPI AND operation to get intersected bit array.
   bstate->counter_allreduce = bstate->counter_allreduce+1;
   std::map<int,int>::iterator it;
-  it = bstate->map_allreduce.find((int) fullcount);
+
+  int size_mpi,size_msg;
+  MPI_Type_size(MPI_LONG_LONG_INT, &size_mpi);
+  size_msg = size_mpi * fullcount;
+
+  it = bstate->map_allreduce.find(size_msg);
   if (it == bstate->map_allreduce.end()){
-        bstate->map_allreduce[(int)fullcount]=1;
+        bstate->map_allreduce[size_msg]=1;
     }
   else{
-    bstate->map_allreduce[(int)fullcount]=bstate->map_allreduce[(int)fullcount]+1;
+    bstate->map_allreduce[size_msg]=bstate->map_allreduce[size_msg]+1;
   }
+  auto start = std::chrono::high_resolution_clock::now();
   MPI_Allreduce(MPI_IN_PLACE, bitvector_.data(), fullcount,
                 MPI_LONG_LONG_INT, MPI_BAND, ctx.mpi_comm);
+
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+  bstate->time_allreduce = bstate->time_allreduce + duration.count();
 
   // Search for flipped bits to populate common cache hit set. There will never
   // be invalid bits in this set.

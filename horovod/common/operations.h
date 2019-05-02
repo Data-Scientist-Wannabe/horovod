@@ -44,6 +44,8 @@ namespace common {
 #define HOROVOD_HIERARCHICAL_ALLGATHER "HOROVOD_HIERARCHICAL_ALLGATHER"
 #define HOROVOD_CACHE_CAPACITY "HOROVOD_CACHE_CAPACITY"
 
+
+
 // Check that Horovod is initialized.
 Status CheckInitialized();
 

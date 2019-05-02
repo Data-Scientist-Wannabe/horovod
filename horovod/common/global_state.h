@@ -123,6 +123,12 @@ struct HorovodGlobalState {
   std::map <int,int> map_allgather;
   std::map <int,int> map_bcast;
 
+  int time_allreduce=0;
+  int time_bcast=0;
+  int time_allgather=0;
+  int time_gather=0;
+  int time_gatherv=0;
+
 
 
   // COMM_WORLD ranks of processes running on this node.
