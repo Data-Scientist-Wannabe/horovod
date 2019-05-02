@@ -351,6 +351,14 @@ void CacheCoordinator::sync(MPIContext& ctx, bool timeline_enabled,BcastState* b
 
   // Global MPI AND operation to get intersected bit array.
   bstate->counter_allreduce = bstate->counter_allreduce+1;
+  std::map<int,int>::iterator it;
+  it = bstate->map_allreduce.find((int) fullcount);
+  if (it == bstate->map_allreduce.end()){
+        bstate->map_allreduce[(int)fullcount]=1;
+    }
+  else{
+    bstate->map_allreduce[(int)fullcount]=bstate->map_allreduce[(int)fullcount]+1;
+  }
   MPI_Allreduce(MPI_IN_PLACE, bitvector_.data(), fullcount,
                 MPI_LONG_LONG_INT, MPI_BAND, ctx.mpi_comm);
 

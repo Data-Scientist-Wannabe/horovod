@@ -209,6 +209,14 @@ void write_to_file()
       myfile << '\t' << itr->first << '\t' << itr->second << '\n';
   }
 
+  printf("Counter all reduce(response cache): %d\n",bcast_state.counter_allreduce);
+  myfile << "Counter all reduce(response cache): " << bcast_state.counter_allreduce << "\n";
+  for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\n'; 
+      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+  }
+
   printf("Counter bcast: %d\n",horovod_global.counter_bcast);
   myfile << "Counter bcast: " << horovod_global.counter_bcast << "\n";
   for (itr = horovod_global.map_bcast.begin(); itr != horovod_global.map_bcast.end(); ++itr) { 
