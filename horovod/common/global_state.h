@@ -112,6 +112,18 @@ struct HorovodGlobalState {
   int counter_allreduce=0;
   std::map <int,int> map_allreduce;
 
+  int counter_bcast = 0;
+
+  int counter_gather = 0;
+  int counter_allgather = 0;
+  int counter_gatherv = 0;
+
+  std::map <int,int> map_gather;
+  std::map <int,int> map_gatherv;
+  std::map <int,int> map_allgather;
+  std::map <int,int> map_bcast;
+
+
 
   // COMM_WORLD ranks of processes running on this node.
   std::vector<int> local_comm_ranks;

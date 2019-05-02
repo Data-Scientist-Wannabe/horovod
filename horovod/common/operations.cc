@@ -42,6 +42,7 @@
 #include "timeline.h"
 #include "logging.h"
 #include "common.h"
+#include <fstream>
 
 #if HAVE_CUDA
 #include "ops/cuda_operations.h"
@@ -89,6 +90,12 @@ namespace {
 
 // All the Horovod state that must be stored globally per-process.
 HorovodGlobalState horovod_global;
+std::map<int,int>::iterator it;
+std::ofstream myfile;
+
+
+BcastState bcast_state;
+
 
 MPIContext mpi_context;
 
@@ -188,6 +195,52 @@ bool IncrementTensorCount(std::unique_ptr<MessageTable>& message_table,
     timeline.NegotiateEnd(name);
   }
   return ready_to_reduce;
+}
+
+void write_to_file()
+{
+  std::map<int,int>::iterator itr;
+
+  printf("Counter all reduce: %d\n",horovod_global.counter_allreduce);
+  myfile << "Counter all reduce: " << horovod_global.counter_allreduce << "\n";
+  for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\n'; 
+      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+  }
+
+  printf("Counter bcast: %d\n",horovod_global.counter_bcast);
+  myfile << "Counter bcast: " << horovod_global.counter_bcast << "\n";
+  for (itr = horovod_global.map_bcast.begin(); itr != horovod_global.map_bcast.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\n'; 
+      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+  }
+
+  printf("Counter all gather: %d\n",horovod_global.counter_allgather);
+  myfile << "Counter all gather: " << horovod_global.counter_allgather << "\n";
+  for (itr = horovod_global.map_allgather.begin(); itr != horovod_global.map_allgather.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\n'; 
+      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+  }
+
+  printf("Counter gather: %d\n",horovod_global.counter_gather);
+  myfile << "Counter gather: " << horovod_global.counter_gather << "\n";
+  for (itr = horovod_global.map_gather.begin(); itr != horovod_global.map_gather.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\n'; 
+      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+  }
+
+  printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
+  myfile << "Counter gatherv: " << horovod_global.counter_gatherv << "\n";
+  for (itr = horovod_global.map_gatherv.begin(); itr != horovod_global.map_gatherv.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\n'; 
+      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+  }
+
 }
 
 // Once a tensor is ready to be reduced, the coordinator sends a Response
@@ -809,7 +862,7 @@ void CoordinateCacheAndState(CacheCoordinator& cache_coordinator,
                              MPIContext& ctx) {
 
   // Sync cache and state information across workers.
-  cache_coordinator.sync(ctx, state.timeline_enabled);
+  cache_coordinator.sync(ctx, state.timeline_enabled,&bcast_state);
 
   // If invalid cache entries exist, erase associated entries.
   if (!cache_coordinator.invalid_bits().empty()) {
@@ -929,12 +982,32 @@ void BackgroundThreadLoop(HorovodGlobalState& state, MPIContext& ctx) {
   MPI_Comm_size(local_comm, &local_size);
   std::vector<int> local_comm_ranks((size_t)local_size);
   local_comm_ranks[local_rank] = rank;
+
+  horovod_global.counter_allgather = horovod_global.counter_allgather+ 1;
+
+  it = horovod_global.map_allgather.find(0);
+  if (it == horovod_global.map_allgather.end()){
+        horovod_global.map_allgather[0]=1;
+      }
+  else{
+      horovod_global.map_allgather[0]=horovod_global.map_allgather[0]+1;
+   }
+
+  it = horovod_global.map_allgather.find(1);
+  if (it == horovod_global.map_allgather.end()){
+        horovod_global.map_allgather[1]=1;
+      }
+  else{
+      horovod_global.map_allgather[1]=horovod_global.map_allgather[1]+1;
+   }
   MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, local_comm_ranks.data(), 1,
                 MPI_INT, local_comm);
 
   // Determine if cluster is homogeneous, i.e., if every node has the same
   // local_size
   auto local_sizes = new int[size];
+
+  horovod_global.counter_allgather = horovod_global.counter_allgather+ 1;
   MPI_Allgather(&local_size, 1, MPI_INT, local_sizes, 1, MPI_INT,
                 ctx.mpi_comm);
 
@@ -1211,7 +1284,7 @@ void RunBypass(std::queue<Request>& message_queue, CacheCoordinator& cache_coord
   state.response_cache.update_cache_bits();
 
   if (state.param_manager.IsAutoTuning()) {
-    state.param_manager.Update(tensor_names, total_tensor_size);
+    state.param_manager.Update(tensor_names, total_tensor_size,&bcast_state);
   }
 }
 
@@ -1406,6 +1479,16 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
     // 1. Get message lengths from every rank.
     auto recvcounts = new int[state.size];
     recvcounts[0] = 0;
+
+    horovod_global.counter_gather = horovod_global.counter_gather + 1;
+
+    it = horovod_global.map_gather.find(1);
+    if (it == horovod_global.map_gather.end()){
+          horovod_global.map_gather[1]=1;
+        }
+    else{
+        horovod_global.map_gather[1]=horovod_global.map_gather[1]+1;
+     }
     MPI_Gather(MPI_IN_PLACE, 1, MPI_INT, recvcounts, 1, MPI_INT, RANK_ZERO,
                ctx.mpi_comm);
 
@@ -1423,6 +1506,15 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
 
     // 3. Collect messages from every rank.
     auto buffer = new uint8_t[total_size];
+
+    horovod_global.counter_gatherv = horovod_global.counter_gatherv+ 1;
+    it = horovod_global.map_gatherv.find(0);
+    if (it == horovod_global.map_gatherv.end()){
+          horovod_global.map_gatherv[0]=1;
+        }
+    else{
+        horovod_global.map_gatherv[0]=horovod_global.map_gatherv[0]+1;
+     }
     MPI_Gatherv(nullptr, 0, MPI_BYTE, buffer, recvcounts, displcmnts, MPI_BYTE,
                 RANK_ZERO, ctx.mpi_comm);
 
@@ -1489,7 +1581,33 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
     // Notify all nodes which tensors we'd like to reduce at this step.
     std::string encoded_response;
     ResponseList::SerializeToString(response_list, encoded_response);
+
+
     int encoded_response_length = (int)encoded_response.length() + 1;
+
+
+    //Profiler start
+    horovod_global.counter_bcast = horovod_global.counter_bcast +2;
+
+
+    it = horovod_global.map_bcast.find((int) encoded_response_length);
+    if (it == horovod_global.map_bcast.end()){
+          horovod_global.map_bcast[(int)encoded_response_length]=1;
+      }
+    else{
+      horovod_global.map_bcast[(int)encoded_response_length]=horovod_global.map_bcast[(int)encoded_response_length]+1;
+    }
+
+    it = horovod_global.map_bcast.find(1);
+    if (it == horovod_global.map_bcast.end()){
+          horovod_global.map_bcast[1]=1;
+      }
+    else{
+      horovod_global.map_bcast[1]=horovod_global.map_bcast[1]+1;
+    }
+    //Profiler end
+
+    
     MPI_Bcast(&encoded_response_length, 1, MPI_INT, RANK_ZERO, ctx.mpi_comm);
     MPI_Bcast((void*)encoded_response.c_str(), encoded_response_length,
               MPI_BYTE, RANK_ZERO, ctx.mpi_comm);
@@ -1504,13 +1622,55 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
     }
     RequestList::SerializeToString(message_list, encoded_message);
     int encoded_message_length = (int)encoded_message.length() + 1;
+
+    horovod_global.counter_gather = horovod_global.counter_gather + 1;
+
+    it = horovod_global.map_gather.find(1);
+    if (it == horovod_global.map_gather.end()){
+          horovod_global.map_gather[1]=1;
+        }
+    else{
+        horovod_global.map_gather[1]=horovod_global.map_gather[1]+1;
+     }
+
     MPI_Gather(&encoded_message_length, 1, MPI_INT, nullptr, 1, MPI_INT,
                RANK_ZERO, ctx.mpi_comm);
+
+    horovod_global.counter_gatherv = horovod_global.counter_gatherv+ 1;
+
+    it = horovod_global.map_gatherv.find(encoded_message_length);
+    if (it == horovod_global.map_gatherv.end()){
+          horovod_global.map_gatherv[encoded_message_length]=1;
+        }
+    else{
+        horovod_global.map_gatherv[encoded_message_length]=horovod_global.map_gatherv[encoded_message_length]+1;
+     }
     MPI_Gatherv((void*)encoded_message.c_str(), encoded_message_length,
                 MPI_BYTE, nullptr, nullptr, nullptr, MPI_BYTE, RANK_ZERO,
                 ctx.mpi_comm);
 
     int msg_length;
+    horovod_global.counter_bcast = horovod_global.counter_bcast +2;
+
+    //Profiler start
+    it = horovod_global.map_bcast.find((int) msg_length);
+    if (it == horovod_global.map_bcast.end()){
+          horovod_global.map_bcast[(int)msg_length]=1;
+      }
+    else{
+      horovod_global.map_bcast[(int)msg_length]=horovod_global.map_bcast[(int)msg_length]+1;
+    }
+
+    it = horovod_global.map_bcast.find(1);
+    if (it == horovod_global.map_bcast.end()){
+          horovod_global.map_bcast[1]=1;
+      }
+    else{
+      horovod_global.map_bcast[1]=horovod_global.map_bcast[1]+1;
+    }
+    //Profiler end
+
+
     MPI_Bcast(&msg_length, 1, MPI_INT, RANK_ZERO, ctx.mpi_comm);
     auto buffer = new uint8_t[msg_length];
     MPI_Bcast(buffer, msg_length, MPI_BYTE, RANK_ZERO, ctx.mpi_comm);
@@ -1552,7 +1712,7 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
   }
 
   if (state.param_manager.IsAutoTuning()) {
-    state.param_manager.Update(tensor_names, total_tensor_size);
+    state.param_manager.Update(tensor_names, total_tensor_size,&bcast_state);
   }
 
   if (response_list.shutdown()) {
@@ -1612,12 +1772,34 @@ void horovod_shutdown() {
     // Reset the initialization flag to allow restarting with horovod_init(...)
     horovod_global.initialize_flag.clear();
     horovod_global.shut_down = false;
-    printf("Counter all reduce: %d\n",horovod_global.counter_allreduce);
 
-    std::map<int,int>::iterator itr;
-    for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
-        std::cout << '\t' << itr->first 
-             << '\t' << itr->second << '\n'; 
+    if(horovod_global.rank==0){
+      myfile.open ("profiler.txt");
+      
+      myfile << "Writing this to a file.\n";
+      
+      
+
+      printf("Counter Bcast: %d\n",horovod_global.counter_bcast);
+      myfile << "Counter Bcast: " << horovod_global.counter_bcast << "\n";
+
+      printf("Counter Bcast_state: %d\n",bcast_state.counter_bcast);
+
+      myfile << "Counter Bcast_state: " << bcast_state.counter_bcast << "\n";
+      printf("Counter Allreduce_state: %d\n",bcast_state.counter_allreduce);
+
+      myfile << "Counter Allreduce_state: " << bcast_state.counter_allreduce << "\n";
+
+      printf("Counter Allgather: %d\n",horovod_global.counter_allgather);
+      printf("Counter gather: %d\n",horovod_global.counter_gather);
+      printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
+
+      myfile << "Counter Allgather: " << horovod_global.counter_allgather << "\n";
+      myfile << "Counter gather: " << horovod_global.counter_gather << "\n";
+      myfile << "Counter gatherv: " << horovod_global.counter_gatherv << "\n";
+
+      write_to_file();
+      myfile.close();
     }
   }
 }

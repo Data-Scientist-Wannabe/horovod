@@ -24,13 +24,21 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-
+#include "myclass.h"
 #include "mpi.h"
 
 #include <Eigen/Core>
 
+
+
+
+
 namespace horovod {
 namespace common {
+
+//struct BcastState{
+//      int counter_bcast=0;
+//};
 
 // ParameterManager encapsulates the various tunable "knobs" in Horovod including the cycle time
 // between iterations of the background thread, and the size of the fusion buffer.
@@ -90,14 +98,14 @@ public:
   //  tensor_names: The names of the tensors that have been processed.
   //  bytes: The number of bytes that were processed per worker.
   //  microseconds: The number of microseconds taken to process the bytes on this worker.
-  void Update(const std::vector<std::string>& tensor_names, int64_t bytes);
+  void Update(const std::vector<std::string>& tensor_names, int64_t bytes, BcastState* global_state);
 
 private:
   // Adjusts the parameter values based on the last observed score.
-  void Tune(double score);
+  void Tune(double score, BcastState* global_state);
 
   // Broadcasts updated parameter values from the coordinator to the other workers.
-  void SyncParams();
+  void SyncParams(BcastState* global_state);
 
   // Resets the tuning state in preparation for evaluating a new set of parameter values.
   void Reset();

@@ -152,7 +152,7 @@ void ParameterManager::SetCycleTimeMs(double value, bool fixed) {
   joint_params_.SetValue(cycle_time_ms, value, fixed);
 }
 
-void ParameterManager::Update(const std::vector<std::string>& tensor_names, int64_t bytes) {
+void ParameterManager::Update(const std::vector<std::string>& tensor_names, int64_t bytes, BcastState* global_state) {
   if (!active_) {
     return;
   }
@@ -176,11 +176,11 @@ void ParameterManager::Update(const std::vector<std::string>& tensor_names, int6
   if (sample_ >= SAMPLES) {
     std::sort(scores_, scores_ + SAMPLES);
     double med_score = scores_[SAMPLES / 2];
-    Tune(med_score);
+    Tune(med_score,global_state);
   }
 }
 
-void ParameterManager::Tune(double score) {
+void ParameterManager::Tune(double score, BcastState* global_state) {
   if (warmup_remaining_ > 0) {
     // Ignore this score as we're still warming up.
     warmup_remaining_--;
@@ -213,14 +213,14 @@ void ParameterManager::Tune(double score) {
     }
 
     // Send the updated parameter values to other workers.
-    SyncParams();
+    SyncParams(global_state);
   }
 
   // Prepare for the next round of collecting statistics.
   Reset();
 }
 
-void ParameterManager::SyncParams() {
+void ParameterManager::SyncParams(BcastState* global_state) {
   Params params;
 
   // Coordinator send the updated parameters.
@@ -245,6 +245,8 @@ void ParameterManager::SyncParams() {
   }
 
   // Broadcast the parameter struct to other workers.
+  global_state->counter_bcast = global_state->counter_bcast + 1;
+  printf("yay\n");
   MPI_Bcast(&params, 1, mpi_params_type_, root_rank_, mpi_comm_);
 
   // The other workers receive the broadcasted parameters and update their internal state in response.

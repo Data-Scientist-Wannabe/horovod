@@ -358,6 +358,17 @@ Status MPIBroadcast::Execute(std::vector<TensorTableEntry>& entries, const Respo
   }
 
   global_state_->timeline.ActivityStartAll(entries, MPI_BCAST);
+  global_state_->counter_bcast = global_state_->counter_bcast +1;
+
+  std::map<int,int>::iterator it;
+  int temp_prof = (int) e.tensor->shape().num_elements();
+  it = global_state_->map_bcast.find(temp_prof);
+  if (it == global_state_->map_bcast.end()){
+        global_state_->map_bcast[temp_prof]=1;
+    }
+  else{
+    global_state_->map_bcast[temp_prof]=global_state_->map_bcast[(int)temp_prof]+1;
+  }
   int op = MPI_Bcast(data_ptr,
                      (int) e.tensor->shape().num_elements(),
                      mpi_context_->GetMPIDataType(e.tensor->dtype()),

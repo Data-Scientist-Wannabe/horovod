@@ -300,7 +300,7 @@ bool CacheCoordinator::uncached_in_queue() const {
   return uncached_in_queue_;
 }
 
-void CacheCoordinator::sync(MPIContext& ctx, bool timeline_enabled) {
+void CacheCoordinator::sync(MPIContext& ctx, bool timeline_enabled,BcastState* bstate) {
   assert(!synced_);
 
   // Resize and initialize bit vector.
@@ -350,6 +350,7 @@ void CacheCoordinator::sync(MPIContext& ctx, bool timeline_enabled) {
   }
 
   // Global MPI AND operation to get intersected bit array.
+  bstate->counter_allreduce = bstate->counter_allreduce+1;
   MPI_Allreduce(MPI_IN_PLACE, bitvector_.data(), fullcount,
                 MPI_LONG_LONG_INT, MPI_BAND, ctx.mpi_comm);
 
@@ -389,6 +390,7 @@ void CacheCoordinator::sync(MPIContext& ctx, bool timeline_enabled) {
     }
 
     // Global MPI OR operation to get common invalid bits.
+    bstate->counter_allreduce = bstate->counter_allreduce+1;
     MPI_Allreduce(MPI_IN_PLACE, bitvector_.data(), count,
                   MPI_LONG_LONG_INT, MPI_BOR, ctx.mpi_comm);
 
