@@ -206,74 +206,74 @@ void write_to_file()
   std::map<int,int>::iterator itr;
 
   printf("Counter all reduce: %d\n",horovod_global.counter_allreduce);
-  myfile << "Counter all reduce: " << horovod_global.counter_allreduce << "\n";
+  myfile << "Counter all reduce," << horovod_global.counter_allreduce << "\n";
 
   printf("Time all reduce: %d microseconds\n",horovod_global.time_allreduce);
-  myfile << "Time all reduce: " << horovod_global.time_allreduce << " microseconds"<< "\n";
+  myfile << "Time all reduce," << horovod_global.time_allreduce << ",microseconds"<< "\n";
 
   for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
-      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << '\n';
   }
 
   printf("Counter all reduce(response cache): %d\n",bcast_state.counter_allreduce);
-  myfile << "Counter all reduce(response cache): " << bcast_state.counter_allreduce << "\n";
+  myfile << "Counter all reduce(response cache):," << bcast_state.counter_allreduce << "\n";
 
   printf("Time all reduce(response cache): %d microseconds\n",bcast_state.time_allreduce);
-  myfile << "Time all reduce(response cache): " << bcast_state.time_allreduce << " microseconds"<< "\n";
+  myfile << "Time all reduce(response cache):," << bcast_state.time_allreduce << ",microseconds"<< "\n";
   for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
-      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << '\n';
   }
 
   printf("Counter bcast: %d\n",horovod_global.counter_bcast);
-  myfile << "Counter bcast: " << horovod_global.counter_bcast << "\n";
+  myfile << "Counter bcast:," << horovod_global.counter_bcast << "\n";
 
   printf("Time Bcast: %d microseconds\n",horovod_global.time_bcast);
-  myfile << "Time Bcast: " << horovod_global.time_bcast << " microseconds"<< "\n";
+  myfile << "Time Bcast:," << horovod_global.time_bcast << ",microseconds"<< "\n";
 
   for (itr = horovod_global.map_bcast.begin(); itr != horovod_global.map_bcast.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
-      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << '\n';
   }
 
   printf("Counter all gather: %d\n",horovod_global.counter_allgather);
-  myfile << "Counter all gather: " << horovod_global.counter_allgather << "\n";
+  myfile << "Counter all gather:," << horovod_global.counter_allgather << "\n";
 
   printf("Time Allgather: %d microseconds\n",horovod_global.time_allgather);
-  myfile << "Time Allgather: " << horovod_global.time_allgather << " microseconds"<< "\n";
+  myfile << "Time Allgather:," << horovod_global.time_allgather << ",microseconds"<< "\n";
 
   for (itr = horovod_global.map_allgather.begin(); itr != horovod_global.map_allgather.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
-      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << '\n';
   }
 
   printf("Counter gather: %d\n",horovod_global.counter_gather);
-  myfile << "Counter gather: " << horovod_global.counter_gather << "\n";
+  myfile << "Counter gather:," << horovod_global.counter_gather << "\n";
 
   printf("Time gather: %d microseconds\n",horovod_global.time_gather);
-  myfile << "Time gather: " << horovod_global.time_gather << " microseconds"<< "\n";
+  myfile << "Time gather:," << horovod_global.time_gather << ",microseconds"<< "\n";
 
   for (itr = horovod_global.map_gather.begin(); itr != horovod_global.map_gather.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
-      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << '\n';
   }
 
   printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
-  myfile << "Counter gatherv: " << horovod_global.counter_gatherv << "\n";
+  myfile << "Counter gatherv:," << horovod_global.counter_gatherv << "\n";
 
   printf("Time gatherv: %d microseconds\n",horovod_global.time_gatherv);
-  myfile << "Time gatherv: " << horovod_global.time_gatherv << " microseconds" << "\n";
+  myfile << "Time gatherv:," << horovod_global.time_gatherv << ",microseconds" << "\n";
 
   for (itr = horovod_global.map_gatherv.begin(); itr != horovod_global.map_gatherv.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\n'; 
-      myfile << '\t' << itr->first << '\t' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << '\n';
   }
 
 }
@@ -1881,27 +1881,26 @@ void horovod_shutdown() {
     if(horovod_global.rank==0){
       myfile.open ("profiler.txt");
       
-      myfile << "Writing this to a file.\n";
       
       
 
       printf("Counter Bcast: %d\n",horovod_global.counter_bcast);
-      myfile << "Counter Bcast: " << horovod_global.counter_bcast << "\n";
+      myfile << "Counter Bcast:," << horovod_global.counter_bcast << "\n";
 
       printf("Counter Bcast_state: %d\n",bcast_state.counter_bcast);
 
-      myfile << "Counter Bcast_state: " << bcast_state.counter_bcast << "\n";
+      myfile << "Counter Bcast_state:," << bcast_state.counter_bcast << "\n";
       printf("Counter Allreduce_state: %d\n",bcast_state.counter_allreduce);
 
-      myfile << "Counter Allreduce_state: " << bcast_state.counter_allreduce << "\n";
+      myfile << "Counter Allreduce_state:," << bcast_state.counter_allreduce << "\n";
 
       printf("Counter Allgather: %d\n",horovod_global.counter_allgather);
       printf("Counter gather: %d\n",horovod_global.counter_gather);
       printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
 
-      myfile << "Counter Allgather: " << horovod_global.counter_allgather << "\n";
-      myfile << "Counter gather: " << horovod_global.counter_gather << "\n";
-      myfile << "Counter gatherv: " << horovod_global.counter_gatherv << "\n";
+      myfile << "Counter Allgather:," << horovod_global.counter_allgather << "\n";
+      myfile << "Counter gather:," << horovod_global.counter_gather << "\n";
+      myfile << "Counter gatherv:," << horovod_global.counter_gatherv << "\n";
 
       write_to_file();
       myfile.close();
