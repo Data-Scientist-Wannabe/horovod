@@ -111,6 +111,7 @@ struct HorovodGlobalState {
 
   int counter_allreduce=0;
   std::map <int,int> map_allreduce;
+  std::map <int,int> time_map_allreduce;
 
   int counter_bcast = 0;
 

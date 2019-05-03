@@ -213,7 +213,7 @@ void write_to_file()
 
   for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\n'; 
+           << '\t' << itr->second << '\t'<< horovod_global.time_map_allreduce[itr->first] <<'\n'; 
       myfile  << itr->first << ',' << itr->second << '\n';
   }
 
@@ -224,7 +224,7 @@ void write_to_file()
   myfile << "Time all reduce(response cache):," << bcast_state.time_allreduce << ",microseconds"<< "\n";
   for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\n'; 
+           << '\t' << itr->second << '\t' << bcast_state.time_map_allreduce[itr->first] << '\n'; 
       myfile  << itr->first << ',' << itr->second << '\n';
   }
 
@@ -1683,14 +1683,14 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
     }
     //Profiler end
 
-    start_prof = std::chrono::high_resolution_clock::now();
+    auto start_prof_b = std::chrono::high_resolution_clock::now();
     MPI_Bcast(&encoded_response_length, 1, MPI_INT, RANK_ZERO, ctx.mpi_comm);
     MPI_Bcast((void*)encoded_response.c_str(), encoded_response_length,
               MPI_BYTE, RANK_ZERO, ctx.mpi_comm);
 
-    stop_prof = std::chrono::high_resolution_clock::now();
-    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
-    horovod_global.time_bcast = horovod_global.time_bcast + duration_prof.count();
+    auto stop_prof_b = std::chrono::high_resolution_clock::now();
+    auto duration_prof_b  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof_b  - start_prof_b ); 
+    horovod_global.time_bcast = horovod_global.time_bcast + duration_prof_b.count();
 
   } else {
     std::string encoded_message;
@@ -1770,14 +1770,14 @@ bool RunLoopOnce(HorovodGlobalState& state, MPIContext& ctx, bool is_coordinator
 
     //Profiler end
 
-    start_prof = std::chrono::high_resolution_clock::now();
+    auto start_prof_b1 = std::chrono::high_resolution_clock::now();
     MPI_Bcast(&msg_length, 1, MPI_INT, RANK_ZERO, ctx.mpi_comm);
     auto buffer = new uint8_t[msg_length];
     MPI_Bcast(buffer, msg_length, MPI_BYTE, RANK_ZERO, ctx.mpi_comm);
 
-    stop_prof = std::chrono::high_resolution_clock::now();
-    duration_prof  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof  - start_prof ); 
-    horovod_global.time_bcast = horovod_global.time_bcast + duration_prof.count();
+    auto stop_prof_b1 = std::chrono::high_resolution_clock::now();
+    auto duration_prof_b1  = std::chrono::duration_cast<std::chrono::microseconds>(stop_prof_b1  - start_prof_b1 ); 
+    horovod_global.time_bcast = horovod_global.time_bcast + duration_prof_b1.count();
 
     ResponseList::ParseFromBytes(response_list, buffer);
     delete[] buffer;
