@@ -214,7 +214,7 @@ void write_to_file()
   for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\t'<< horovod_global.time_map_allreduce[itr->first] <<'\n'; 
-      myfile  << itr->first << ',' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << ','<< horovod_global.time_map_allreduce[itr->first]<<'\n';
   }
 
   printf("Counter all reduce(response cache): %d\n",bcast_state.counter_allreduce);
@@ -225,7 +225,7 @@ void write_to_file()
   for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
       std::cout << '\t' << itr->first 
            << '\t' << itr->second << '\t' << bcast_state.time_map_allreduce[itr->first] << '\n'; 
-      myfile  << itr->first << ',' << itr->second << '\n';
+      myfile  << itr->first << ',' << itr->second << ',' << bcast_state.time_map_allreduce[itr->first]<<'\n';
   }
 
   printf("Counter bcast: %d\n",horovod_global.counter_bcast);
