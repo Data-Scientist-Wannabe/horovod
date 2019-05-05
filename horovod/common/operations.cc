@@ -1880,14 +1880,7 @@ void horovod_init_comm(MPI_Comm comm) {
 }
 
 void horovod_shutdown() {
-  if (horovod_global.background_thread.joinable()) {
-    horovod_global.shut_down = true;
-    horovod_global.background_thread.join();
-    // Reset the initialization flag to allow restarting with horovod_init(...)
-    horovod_global.initialize_flag.clear();
-    horovod_global.shut_down = false;
-
-    if(horovod_global.rank==0){
+  if(horovod_global.rank==0){
       myfile.open ("profiler.txt");
       
       
@@ -1914,6 +1907,14 @@ void horovod_shutdown() {
       write_to_file();
       myfile.close();
     }
+  if (horovod_global.background_thread.joinable()) {
+    horovod_global.shut_down = true;
+    horovod_global.background_thread.join();
+    // Reset the initialization flag to allow restarting with horovod_init(...)
+    horovod_global.initialize_flag.clear();
+    horovod_global.shut_down = false;
+
+    
   }
 }
 
