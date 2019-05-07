@@ -15,7 +15,8 @@
 // =============================================================================
 
 #include "nccl_operations.h"
-
+#include "map"
+#include <chrono>
 namespace horovod {
 namespace common {
 
@@ -87,10 +88,37 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
   }
 
   // Do allreduce.
+  global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
+  std::map<int,int>::iterator it;
+  int size_mpi,size_msg;
+
+
+  
+
+  //printf("counter %d\n",global_state_->counter_allreduce);
+  auto start = std::chrono::high_resolution_clock::now();
   auto nccl_result = ncclAllReduce(fused_input_data, buffer_data,
                                    (size_t) num_elements,
                                    GetNCCLDataType(first_entry.tensor), ncclSum,
                                    *nccl_comm_, *stream_);
+
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+  global_state_->time_allreduce = global_state_->time_allreduce + duration.count();
+
+
+  //MPI_Type_size(mpi_context_->GetNCCLDataType(first_entry.tensor), &size_mpi);
+  size_msg = static_cast<int>(num_elements);
+  it = global_state_->map_allreduce.find(size_msg);
+  if (it == global_state_->map_allreduce.end()){
+        global_state_->map_allreduce[size_msg]=1;
+        global_state_->time_map_allreduce[size_msg] = duration.count();
+    }
+  else{
+    global_state_->map_allreduce[size_msg]=global_state_->map_allreduce[size_msg]+1;
+    global_state_->time_map_allreduce[size_msg] = global_state_->time_map_allreduce[size_msg] + duration.count();
+  }
+
   nccl_context_->ErrorCheck("ncclAllReduce", nccl_result);
   if (global_state_->timeline.Initialized()) {
     cuda_context_->RecordEvent(event_queue_, NCCL_ALLREDUCE, *stream_);
@@ -125,11 +153,35 @@ void NCCLAllreduce::InitNCCLComm(const std::vector<TensorTableEntry>& entries,
       nccl_context_->ErrorCheck("ncclGetUniqueId", ncclGetUniqueId(&nccl_id));
     }
 
+
+    global_state_->counter_bcast = global_state_->counter_bcast +1;
+
+
+    std::map<int,int>::iterator it;
+   
+
+    int size_msg;
+
+
+    
+    size_msg = static_cast<int>(sizeof(nccl_id));
+
+    it = global_state_->map_bcast.find(size_msg);
+    if (it == global_state_->map_bcast.end()){
+          global_state_->map_bcast[size_msg]=1;
+      }
+    else{
+      global_state_->map_bcast[size_msg]=global_state_->map_bcast[size_msg]+1;
+    }
+    auto start = std::chrono::high_resolution_clock::now();
     int bcast_op = MPI_Bcast((void*) &nccl_id,
                              sizeof(nccl_id),
                              mpi_context_->GetMPIDataType(HOROVOD_BYTE),
                              0,
                              mpi_context_->GetMPICommunicator(nccl_id_bcast_comm));
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+    global_state_->time_bcast = global_state_->time_bcast + duration.count();
     if (bcast_op != MPI_SUCCESS) {
       throw std::logic_error("MPI_Broadcast failed, see MPI output for details.");
     }
@@ -311,6 +363,18 @@ Status NCCLHierarchicalAllreduce::Execute(std::vector<TensorTableEntry>& entries
     timeline.ActivityEndAll(entries);
 
     timeline.ActivityStartAll(entries, MPI_ALLREDUCE);
+
+    global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
+    std::map<int,int>::iterator it;
+
+    it = global_state_->map_allreduce.find((int) num_elements);
+    if (it == global_state_->map_allreduce.end()){
+          global_state_->map_allreduce[(int)num_elements]=1;
+      }
+    else{
+      global_state_->map_allreduce[(int)num_elements]=global_state_->map_allreduce[(int)num_elements]+1;
+    }
+
     int op = MPI_Allreduce(MPI_IN_PLACE, host_buffer_,
                            (int) total_num_elements,
                            mpi_context_->GetMPIDataType(first_entry.tensor),
