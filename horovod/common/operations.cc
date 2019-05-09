@@ -233,6 +233,20 @@ void write_to_file()
       myfile  << itr->first << ',' << itr->second << ',' << bcast_state.time_map_allreduce[itr->first]/itr->second <<',' << bcast_state.time_map_allreduce[itr->first]<<'\n';
   }
 
+
+  printf("Counter all reduce(nccl): %d\n",horovod_global.counter_allreduce_nccl);
+  myfile << "Counter all reduce(nccl):," << horovod_global.counter_allreduce_nccl << "\n";
+
+  printf("Time all reduce(nccl): %d microseconds\n",horovod_global.time_allreduce_nccl);
+  myfile << "Time all reduce(nccl):," << horovod_global.time_allreduce_nccl << ",microseconds"<< "\n";
+  std::cout << "\tMessage size\t" << "count\t" << "Time per call\t" << "Total time"<< '\n';
+  myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
+  for (itr = horovod_global.map_allreduce_nccl.begin(); itr != horovod_global.map_allreduce_nccl.end(); ++itr) { 
+      std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\t' << horovod_global.time_map_allreduce_nccl[itr->first]/itr->second << '\t' << horovod_global.time_map_allreduce_nccl[itr->first] << '\n'; 
+      myfile  << itr->first << ',' << itr->second << ',' << horovod_global.time_map_allreduce_nccl[itr->first]/itr->second <<',' << horovod_global.time_map_allreduce_nccl[itr->first]<<'\n';
+  }
+
   printf("Counter bcast: %d\n",horovod_global.counter_bcast);
   myfile << "Counter bcast:," << horovod_global.counter_bcast << "\n";
 
@@ -1880,6 +1894,7 @@ void horovod_init_comm(MPI_Comm comm) {
 }
 
 void horovod_shutdown() {
+
   if(horovod_global.rank==0){
       myfile.open ("profiler.txt");
       
@@ -1907,6 +1922,7 @@ void horovod_shutdown() {
       write_to_file();
       myfile.close();
     }
+  MPI_Barrier(mpi_context.GetMPICommunicator(Communicator::GLOBAL));
   if (horovod_global.background_thread.joinable()) {
     horovod_global.shut_down = true;
     horovod_global.background_thread.join();
