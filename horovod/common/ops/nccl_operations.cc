@@ -88,9 +88,9 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
   }
 
   // Do allreduce.
-  global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
+  global_state_->counter_allreduce_nccl = global_state_->counter_allreduce_nccl + 1;
   std::map<int,int>::iterator it;
-  int size_mpi,size_msg;
+  int size_msg;
 
 
   
@@ -102,22 +102,7 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
                                    GetNCCLDataType(first_entry.tensor), ncclSum,
                                    *nccl_comm_, *stream_);
 
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
-  global_state_->time_allreduce = global_state_->time_allreduce + duration.count();
-
-
-  //MPI_Type_size(mpi_context_->GetNCCLDataType(first_entry.tensor), &size_mpi);
-  size_msg = static_cast<int>(num_elements);
-  it = global_state_->map_allreduce.find(size_msg);
-  if (it == global_state_->map_allreduce.end()){
-        global_state_->map_allreduce[size_msg]=1;
-        global_state_->time_map_allreduce[size_msg] = duration.count();
-    }
-  else{
-    global_state_->map_allreduce[size_msg]=global_state_->map_allreduce[size_msg]+1;
-    global_state_->time_map_allreduce[size_msg] = global_state_->time_map_allreduce[size_msg] + duration.count();
-  }
+  
 
   nccl_context_->ErrorCheck("ncclAllReduce", nccl_result);
   if (global_state_->timeline.Initialized()) {
@@ -133,7 +118,30 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
     }
   }
 
-  return FinalizeCUDAQueue(entries);
+  auto prof_temp_output = FinalizeCUDAQueue(entries);
+
+
+
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+  global_state_->time_allreduce_nccl = global_state_->time_allreduce_nccl + duration.count();
+
+
+  //MPI_Type_size(mpi_context_->GetNCCLDataType(first_entry.tensor), &size_mpi);
+  size_msg = static_cast<int>(num_elements);
+  it = global_state_->map_allreduce_nccl.find(size_msg);
+  if (it == global_state_->map_allreduce_nccl.end()){
+        global_state_->map_allreduce_nccl[size_msg]=1;
+        global_state_->time_map_allreduce_nccl[size_msg] = duration.count();
+    }
+  else{
+    global_state_->map_allreduce_nccl[size_msg]=global_state_->map_allreduce_nccl[size_msg]+1;
+    global_state_->time_map_allreduce_nccl[size_msg] = global_state_->time_map_allreduce_nccl[size_msg] + duration.count();
+  }
+  std::cout<<size_msg<<"     \t"<<duration.count()<<"\n";
+
+
+  return prof_temp_output;
 }
 
 void NCCLAllreduce::InitNCCLComm(const std::vector<TensorTableEntry>& entries,
@@ -366,20 +374,33 @@ Status NCCLHierarchicalAllreduce::Execute(std::vector<TensorTableEntry>& entries
 
     global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
     std::map<int,int>::iterator it;
-
-    it = global_state_->map_allreduce.find((int) num_elements);
-    if (it == global_state_->map_allreduce.end()){
-          global_state_->map_allreduce[(int)num_elements]=1;
-      }
-    else{
-      global_state_->map_allreduce[(int)num_elements]=global_state_->map_allreduce[(int)num_elements]+1;
-    }
-
+    int size_mpi,size_msg;
+    auto start = std::chrono::high_resolution_clock::now();
     int op = MPI_Allreduce(MPI_IN_PLACE, host_buffer_,
                            (int) total_num_elements,
                            mpi_context_->GetMPIDataType(first_entry.tensor),
                            mpi_context_->GetMPISumOp(first_entry.tensor->dtype()),
                            mpi_context_->GetMPICommunicator(Communicator::CROSS));
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+    global_state_->time_allreduce = global_state_->time_allreduce + duration.count();
+
+
+    MPI_Type_size(mpi_context_->GetMPIDataType(first_entry.tensor), &size_mpi);
+    size_msg = size_mpi * (int)total_num_elements;
+    it = global_state_->map_allreduce.find(size_msg);
+    if (it == global_state_->map_allreduce.end()){
+          global_state_->map_allreduce[size_msg]=1;
+          global_state_->time_map_allreduce[size_msg] = duration.count();
+      }
+    else{
+      global_state_->map_allreduce[size_msg]=global_state_->map_allreduce[size_msg]+1;
+      global_state_->time_map_allreduce[size_msg] = global_state_->time_map_allreduce[size_msg] + duration.count();
+    }
+
+
+  
     if (op != MPI_SUCCESS) {
       throw std::logic_error("MPI_Allreduce failed, see MPI output for details.");
     }

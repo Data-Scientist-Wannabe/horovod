@@ -110,8 +110,12 @@ struct HorovodGlobalState {
   std::vector<int> ranks;
 
   int counter_allreduce=0;
+  int counter_allreduce_nccl=0;
   std::map <int,int> map_allreduce;
   std::map <int,int> time_map_allreduce;
+
+  std::map <int,int> map_allreduce_nccl;
+  std::map <int,int> time_map_allreduce_nccl;
 
   int counter_bcast = 0;
 
@@ -125,6 +129,7 @@ struct HorovodGlobalState {
   std::map <int,int> map_bcast;
 
   int time_allreduce=0;
+  int time_allreduce_nccl=0;
   int time_bcast=0;
   int time_allgather=0;
   int time_gather=0;
