@@ -64,6 +64,7 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
   InitCUDA(entries);
   InitNCCLComm(entries, response.devices());
   InitCUDAQueue(entries, response);
+  struct time_nccl op_entry;
 
   const void* fused_input_data;
   void* buffer_data;
@@ -97,6 +98,11 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
 
   //printf("counter %d\n",global_state_->counter_allreduce);
   auto start = std::chrono::high_resolution_clock::now();
+
+  op_entry.start=start;
+  op_entry.start=start;
+  op_entry.msg_size=static_cast<int>(num_elements);
+
   auto nccl_result = ncclAllReduce(fused_input_data, buffer_data,
                                    (size_t) num_elements,
                                    GetNCCLDataType(first_entry.tensor), ncclSum,
@@ -118,7 +124,7 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
     }
   }
 
-  auto prof_temp_output = FinalizeCUDAQueue(entries);
+  auto prof_temp_output = FinalizeCUDAQueue(entries,start,static_cast<int>(num_elements),global_state_);
 
 
 
@@ -129,6 +135,8 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
 
   //MPI_Type_size(mpi_context_->GetNCCLDataType(first_entry.tensor), &size_mpi);
   size_msg = static_cast<int>(num_elements);
+
+  /**
   it = global_state_->map_allreduce_nccl.find(size_msg);
   if (it == global_state_->map_allreduce_nccl.end()){
         global_state_->map_allreduce_nccl[size_msg]=1;
@@ -138,8 +146,8 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
     global_state_->map_allreduce_nccl[size_msg]=global_state_->map_allreduce_nccl[size_msg]+1;
     global_state_->time_map_allreduce_nccl[size_msg] = global_state_->time_map_allreduce_nccl[size_msg] + duration.count();
   }
-  std::cout<<size_msg<<"     \t"<<duration.count()<<"\n";
-
+  //std::cout<<size_msg<<"     \t"<<duration.count()<<"\n";
+  **/
 
   return prof_temp_output;
 }
@@ -444,7 +452,13 @@ Status NCCLHierarchicalAllreduce::Execute(std::vector<TensorTableEntry>& entries
     }
   }
 
-  return FinalizeCUDAQueue(entries);
+  struct time_nccl op_entry;
+
+  auto start=std::chrono::high_resolution_clock::now();
+  
+  int msg_size=static_cast<int>(-1);
+
+  return FinalizeCUDAQueue(entries,start,msg_size,global_state_);
 }
 
 bool NCCLHierarchicalAllreduce::Enabled(const ParameterManager& param_manager,

@@ -145,7 +145,7 @@ void CUDAAllreduce::InitCUDAQueue(const std::vector<TensorTableEntry>& entries, 
   }
 }
 
-Status CUDAAllreduce::FinalizeCUDAQueue(const std::vector<TensorTableEntry>& entries) {
+Status CUDAAllreduce::FinalizeCUDAQueue(const std::vector<TensorTableEntry>& entries,std::chrono::time_point <std::chrono::high_resolution_clock> start, int msg_size,HorovodGlobalState* global_state_) {
   // Use completion marker via event because it's faster than
   // blocking cudaStreamSynchronize() in this thread.
   cuda_context_->RecordEvent(event_queue_, "", *stream_);
@@ -158,7 +158,7 @@ Status CUDAAllreduce::FinalizeCUDAQueue(const std::vector<TensorTableEntry>& ent
 
   // TODO: use thread pool or single thread for callbacks
   std::thread finalizer_thread([entries, first_entry, host_buffer,
-                                event_queue, &timeline, &cuda_context]() mutable {
+                                event_queue, &timeline, &cuda_context,start,msg_size,global_state_]() mutable {
     auto cuda_result = cudaSetDevice(first_entry.device);
     cuda_context->ErrorCheck("cudaSetDevice", cuda_result);
 
@@ -171,6 +171,27 @@ Status CUDAAllreduce::FinalizeCUDAQueue(const std::vector<TensorTableEntry>& ent
       timeline.End(e.tensor_name, e.output);
       e.callback(Status::OK());
     }
+    auto stop=std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+    
+    //std::cout<<msg_size<<" "<<duration.count()<<"\n";
+
+    std::map<int,int>::iterator it;
+
+    //std::lock(global_state_->nccl_prof);
+    global_state_->nccl_prof.lock();
+    it = global_state_->map_allreduce_nccl.find(msg_size);
+    if (it == global_state_->map_allreduce_nccl.end()){
+          global_state_->map_allreduce_nccl[msg_size]=1;
+          global_state_->time_map_allreduce_nccl[msg_size] = duration.count();
+      }
+    else{
+      global_state_->map_allreduce_nccl[msg_size]=global_state_->map_allreduce_nccl[msg_size]+1;
+      global_state_->time_map_allreduce_nccl[msg_size] = global_state_->time_map_allreduce_nccl[msg_size] + duration.count();
+    }
+    global_state_->nccl_prof.unlock();
+    
+
   });
 
   finalizer_thread.detach();

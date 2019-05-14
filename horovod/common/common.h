@@ -20,7 +20,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-
+#include <chrono>
 #include "message.h"
 
 namespace horovod {
@@ -49,6 +49,12 @@ namespace common {
 #define NCCL_BCAST "NCCL_BCAST"
 #define COPY_ALLGATHER_OUTPUT "COPY_ALLGATHER_OUTPUT"
 #define ALLOCATE_SHARED_BUFFER "ALLOCATE_SHARED_BUFFER"
+
+struct time_nccl{
+  std::chrono::time_point <std::chrono::high_resolution_clock> start;
+  std::chrono::time_point <std::chrono::high_resolution_clock> stop;
+  int msg_size;
+};
 
 // Device ID used for CPU.
 #define CPU_DEVICE_ID (-1)

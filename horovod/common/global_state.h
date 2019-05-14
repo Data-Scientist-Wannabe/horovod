@@ -19,6 +19,7 @@
 
 #include <queue>
 #include <thread>
+#include <mutex>
 #include <map>
 
 #include "fusion_buffer_manager.h"
@@ -113,6 +114,8 @@ struct HorovodGlobalState {
   int counter_allreduce_nccl=0;
   std::map <int,int> map_allreduce;
   std::map <int,int> time_map_allreduce;
+
+  std::mutex nccl_prof;
 
   std::map <int,int> map_allreduce_nccl;
   std::map <int,int> time_map_allreduce_nccl;
