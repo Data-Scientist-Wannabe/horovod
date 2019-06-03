@@ -35,6 +35,8 @@ torch_mpi_lib_impl = Extension('horovod.torch.mpi_lib_impl', [])
 torch_mpi_lib_v2 = Extension('horovod.torch.mpi_lib_v2', [])
 mxnet_mpi_lib = Extension('horovod.mxnet.mpi_lib', [])
 
+mlsl_root = os.environ.get('MLSL_ROOT')
+have_mlsl = mlsl_root is not None
 
 def is_build_action():
     if len(sys.argv) <= 1:
@@ -81,10 +83,22 @@ def check_mx_version():
             'Your MXNet version is outdated.  Horovod requires mxnet>1.3.0')
 
 
+def check_avx_supported():
+    try:
+        flags_output = subprocess.check_output(
+            'gcc -march=native -E -v - </dev/null 2>&1 | grep cc1',
+            shell=True, universal_newlines=True).strip()
+        flags = shlex.split(flags_output)
+        return '+f16c' in flags and '+avx' in flags
+    except subprocess.CalledProcessError:
+        # Fallback to non-AVX if were not able to get flag information.
+        return False
+
+
 def get_cpp_flags(build_ext):
     last_err = None
     default_flags = ['-std=c++11', '-fPIC', '-O2', '-Wall']
-    avx_flags = ['-mf16c', '-mavx']
+    avx_flags = ['-mf16c', '-mavx'] if check_avx_supported() else []
     if sys.platform == 'darwin':
         # Darwin most likely will have Clang, which has libc++.
         flags_to_try = [default_flags + ['-stdlib=libc++'] + avx_flags,
@@ -564,6 +578,13 @@ def get_common_options(build_ext):
     LINK_FLAGS = link_flags + shlex.split(mpi_flags)
     LIBRARY_DIRS = []
     LIBRARIES = []
+
+    if have_mlsl:
+        MACROS += [('HAVE_MLSL', '1')]
+        INCLUDES += [mlsl_root + '/intel64/include/']
+        SOURCES += ['horovod/common/ops/mlsl_operations.cc']
+        LIBRARY_DIRS += [mlsl_root + '/intel64/lib/']
+        LINK_FLAGS += ['-lmlsl']
 
     if have_cuda:
         MACROS += [('HAVE_CUDA', '1')]
