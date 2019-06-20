@@ -25,6 +25,18 @@ MPI_CUDAAllreduce::MPI_CUDAAllreduce(MPIContext* mpi_context,
     : CUDAAllreduce(cuda_context, global_state),
       mpi_context_(mpi_context) {}
 
+unsigned int nextPowerOf2(unsigned int n)
+{
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
+
 Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Response& response) {
   auto& first_entry = entries[0];
 
@@ -60,11 +72,14 @@ Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const 
 
   int size_mpi,size_msg;
 
-
+  int64_t new_num_elements = nextPowerOf2((int) num_elements);
+  std::cout << "---------- calling allreduce on "
+            << (int) num_elements << " and new val = "
+            << (int) new_num_elements << std::endl;	
   
   auto start = std::chrono::high_resolution_clock::now();
   int op = MPI_Allreduce(sendbuf, buffer_data,
-                         (int) num_elements,
+                         (int) new_num_elements,
                          mpi_context_->GetMPIDataType(first_entry.tensor),
                          mpi_context_->GetMPISumOp(first_entry.tensor->dtype()),
                          mpi_context_->GetMPICommunicator(Communicator::GLOBAL));
