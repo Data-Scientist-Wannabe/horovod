@@ -90,7 +90,7 @@ Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const 
 
 
   MPI_Type_size(mpi_context_->GetMPIDataType(first_entry.tensor), &size_mpi);
-  size_msg = size_mpi * (int)num_elements;
+  size_msg = size_mpi * (int)new_num_elements;
   it = global_state_->map_allreduce.find(size_msg);
   if (it == global_state_->map_allreduce.end()){
         global_state_->map_allreduce[size_msg]=1;
