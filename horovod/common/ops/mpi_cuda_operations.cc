@@ -19,6 +19,24 @@
 namespace horovod {
 namespace common {
 
+  unsigned int nextPowerOf2_cuda(unsigned int n)  
+{  
+    unsigned count = 0;  
+      
+    // First n in the below condition  
+    // is for the case where n is 0  
+    if (n && !(n & (n - 1)))  
+        return n;  
+      
+    while( n != 0)  
+    {  
+        n >>= 1;  
+        count += 1;  
+    }  
+      
+    return 1 << count;  
+} 
+
 MPI_CUDAAllreduce::MPI_CUDAAllreduce(MPIContext* mpi_context,
                                      CUDAContext* cuda_context,
                                      HorovodGlobalState* global_state)
@@ -44,6 +62,8 @@ Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const 
     auto cuda_result = cudaStreamSynchronize(cuda_context_->streams[entries[0].device]);
     cuda_context_->ErrorCheck("cudaStreamSynchronize", cuda_result);
 
+
+    num_elements = nextPowerOf2_cuda((int)num_elements);
     timeline.ActivityEndAll(entries);
   } else {
     buffer_data = (void*) first_entry.output->data();
