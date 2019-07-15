@@ -19,6 +19,44 @@
 namespace horovod {
 namespace common {
 
+  unsigned int table_msg_size_lookup(unsigned int n ){
+    n = n * sizeof(float );
+    int msg_size[28] = {8,
+                    16,
+                    32,
+                    64,
+                    128,
+                    256,
+                    512,
+                    1024,
+                    2048,
+                    4096,
+                    8192,
+                    16384,
+                    32768,
+                    65536,
+                    131072,
+                    262144,
+                    524288,
+                    1048576,
+                    2097152,
+                    4194304,
+                    8388608,
+                    16777216,
+                    25165824,
+                    33554432,
+                    41943040,
+                    50331648,
+                    58720256,
+                    67108864};
+  for(int i = 0 ; i< 28; ++i){
+    if (n < msg_size[i]){
+      return msg_size[i] / sizeof(float);
+    }
+  }
+
+  }
+
   unsigned int nextPowerOf2_cuda(unsigned int n)  
 {  
     unsigned count = 0;  
@@ -54,7 +92,7 @@ Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const 
 
   // Copy memory into the fusion buffer.
   auto& timeline = global_state_->timeline;
-  if (entries.size() > 1) {
+  if (entries.size() > 1 || 1) {
     timeline.ActivityStartAll(entries, MEMCPY_IN_FUSION_BUFFER);
     const void* fused_input_data;
     MemcpyInFusionBuffer(entries, fused_input_data, buffer_data, buffer_len);
@@ -63,7 +101,7 @@ Status MPI_CUDAAllreduce::Execute(std::vector<TensorTableEntry>& entries, const 
     cuda_context_->ErrorCheck("cudaStreamSynchronize", cuda_result);
 
 
-    num_elements = nextPowerOf2_cuda((int)num_elements);
+    num_elements = table_msg_size_lookup((int)num_elements);
     timeline.ActivityEndAll(entries);
   } else {
     buffer_data = (void*) first_entry.output->data();
