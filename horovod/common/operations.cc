@@ -246,10 +246,10 @@ void write_to_file()
       MPI_Allreduce(&horovod_global.time_map_allreduce[itr->first] , &allreduce_time,1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
       allreduce_time= allreduce_time/world_size;
 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\t'<< horovod_global.time_map_allreduce[itr->first]/itr->second <<'\t' << allreduce_time/itr->second <<'\t' <<horovod_global.time_map_allreduce[itr->first] <<'\n'; 
-      sleep(3);
+   
       if(horovod_global.rank==0){
+        std::cout << '\t' << itr->first 
+           << '\t' << itr->second << '\t'<< horovod_global.time_map_allreduce[itr->first]/itr->second <<'\t' << allreduce_time/itr->second <<'\t' <<horovod_global.time_map_allreduce[itr->first] <<'\n'; 
         myfile  << itr->first << ',' << itr->second << ','<< horovod_global.time_map_allreduce[itr->first]/itr->second << ',' << horovod_global.time_map_allreduce[itr->first]<<'\n';
       }
   }
