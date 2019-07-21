@@ -235,12 +235,12 @@ void write_to_file()
   if(horovod_global.rank==0){
     printf("Time all reduce: %d %d microseconds\n",horovod_global.time_allreduce,temp/world_size);
     myfile << "Time all reduce," << horovod_global.time_allreduce << ",microseconds"<< "\n";
+  
+
+
+    std::cout << "\tMessage size\t" << "count\t" << "Time per call\t"<<"Time per call(allreduce op)\t" << "Total time"<< '\n';
+    myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
   }
-
-
-  std::cout << "\tMessage size\t" << "count\t" << "Time per call\t"<<"Time per call(allreduce op)\t" << "Total time"<< '\n';
-  myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
-
   int allreduce_time;
   for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
       MPI_Allreduce(&horovod_global.time_map_allreduce[itr->first] , &allreduce_time,1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
