@@ -219,101 +219,122 @@ bool IncrementTensorCount(std::unique_ptr<MessageTable>& message_table,
 void write_to_file()
 {
   std::map<int,int>::iterator itr;
+  int temp;
 
-  printf("Counter all reduce: %d\n",horovod_global.counter_allreduce);
-  myfile << "Counter all reduce," << horovod_global.counter_allreduce << "\n";
+  int world_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  MPI_Allreduce(&horovod_global.counter_allreduce , &temp,1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-  printf("Time all reduce: %d microseconds\n",horovod_global.time_allreduce);
-  myfile << "Time all reduce," << horovod_global.time_allreduce << ",microseconds"<< "\n";
+  if(horovod_global.rank==0){
+    printf("Counter all reduce: %d %d \n",horovod_global.counter_allreduce,temp/world_size);
+    myfile << "Counter all reduce," << horovod_global.counter_allreduce << "\n";
+  }
 
 
-  std::cout << "\tMessage size\t" << "count\t" << "Time per call\t" << "Total time"<< '\n';
+  MPI_Allreduce(&horovod_global.time_allreduce , &temp,1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  if(horovod_global.rank==0){
+    printf("Time all reduce: %d %d microseconds\n",horovod_global.time_allreduce,temp/world_size);
+    myfile << "Time all reduce," << horovod_global.time_allreduce << ",microseconds"<< "\n";
+  }
+
+
+  std::cout << "\tMessage size\t" << "count\t" << "Time per call\t"<<"Time per call(allreduce op)\t" << "Total time"<< '\n';
   myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
+
+  int allreduce_time;
   for (itr = horovod_global.map_allreduce.begin(); itr != horovod_global.map_allreduce.end(); ++itr) { 
+      MPI_Allreduce(&horovod_global.time_map_allreduce[itr->first] , &allreduce_time,1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+      allreduce_time= allreduce_time/world_size;
+
       std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\t'<< horovod_global.time_map_allreduce[itr->first]/itr->second <<'\t'<<horovod_global.time_map_allreduce[itr->first] <<'\n'; 
-      myfile  << itr->first << ',' << itr->second << ','<< horovod_global.time_map_allreduce[itr->first]/itr->second << ',' << horovod_global.time_map_allreduce[itr->first]<<'\n';
+           << '\t' << itr->second << '\t'<< horovod_global.time_map_allreduce[itr->first]/itr->second <<'\t' << allreduce_time/itr->second <<'\t' <<horovod_global.time_map_allreduce[itr->first] <<'\n'; 
+      sleep(3);
+      if(horovod_global.rank==0){
+        myfile  << itr->first << ',' << itr->second << ','<< horovod_global.time_map_allreduce[itr->first]/itr->second << ',' << horovod_global.time_map_allreduce[itr->first]<<'\n';
+      }
   }
 
-  printf("Counter all reduce(response cache): %d\n",bcast_state.counter_allreduce);
-  myfile << "Counter all reduce(response cache):," << bcast_state.counter_allreduce << "\n";
+  if(horovod_global.rank==0){
 
-  printf("Time all reduce(response cache): %d microseconds\n",bcast_state.time_allreduce);
-  myfile << "Time all reduce(response cache):," << bcast_state.time_allreduce << ",microseconds"<< "\n";
-  std::cout << "\tMessage size\t" << "count\t" << "Time per call\t" << "Total time"<< '\n';
-  myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
-  for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\t' << bcast_state.time_map_allreduce[itr->first]/itr->second << '\t' << bcast_state.time_map_allreduce[itr->first] << '\n'; 
-      myfile  << itr->first << ',' << itr->second << ',' << bcast_state.time_map_allreduce[itr->first]/itr->second <<',' << bcast_state.time_map_allreduce[itr->first]<<'\n';
+    printf("Counter all reduce(response cache): %d\n",bcast_state.counter_allreduce);
+    myfile << "Counter all reduce(response cache):," << bcast_state.counter_allreduce << "\n";
+
+    printf("Time all reduce(response cache): %d microseconds\n",bcast_state.time_allreduce);
+    myfile << "Time all reduce(response cache):," << bcast_state.time_allreduce << ",microseconds"<< "\n";
+    std::cout << "\tMessage size\t" << "count\t" << "Time per call\t" << "Total time"<< '\n';
+    myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
+    for (itr = bcast_state.map_allreduce.begin(); itr != bcast_state.map_allreduce.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\t' << bcast_state.time_map_allreduce[itr->first]/itr->second << '\t' << bcast_state.time_map_allreduce[itr->first] << '\n'; 
+        myfile  << itr->first << ',' << itr->second << ',' << bcast_state.time_map_allreduce[itr->first]/itr->second <<',' << bcast_state.time_map_allreduce[itr->first]<<'\n';
+    }
+
+
+    printf("Counter all reduce(nccl): %d\n",horovod_global.counter_allreduce_nccl);
+    myfile << "Counter all reduce(nccl):," << horovod_global.counter_allreduce_nccl << "\n";
+
+    printf("Time all reduce(nccl): %d microseconds\n",horovod_global.time_allreduce_nccl);
+    myfile << "Time all reduce(nccl):," << horovod_global.time_allreduce_nccl << ",microseconds"<< "\n";
+    std::cout << "\tMessage size\t" << "count\t" << "Time per call\t" << "Total time"<< '\n';
+    myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
+    for (itr = horovod_global.map_allreduce_nccl.begin(); itr != horovod_global.map_allreduce_nccl.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\t' << horovod_global.time_map_allreduce_nccl[itr->first]/itr->second << '\t' << horovod_global.time_map_allreduce_nccl[itr->first] << '\n'; 
+        myfile  << itr->first << ',' << itr->second << ',' << horovod_global.time_map_allreduce_nccl[itr->first]/itr->second <<',' << horovod_global.time_map_allreduce_nccl[itr->first]<<'\n';
+    }
+
+    printf("Counter bcast: %d\n",horovod_global.counter_bcast);
+    myfile << "Counter bcast:," << horovod_global.counter_bcast << "\n";
+
+    printf("Time Bcast: %d microseconds\n",horovod_global.time_bcast);
+    std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
+    myfile << "Time Bcast:," << horovod_global.time_bcast << ",microseconds"<< "\n";
+    myfile << "Message size," << "count," << "Total time"<< '\n';
+    for (itr = horovod_global.map_bcast.begin(); itr != horovod_global.map_bcast.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\n'; 
+        myfile  << itr->first << ',' << itr->second << '\n';
+    }
+
+    printf("Counter all gather: %d\n",horovod_global.counter_allgather);
+    myfile << "Counter all gather:," << horovod_global.counter_allgather << "\n";
+
+    printf("Time Allgather: %d microseconds\n",horovod_global.time_allgather);
+    std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
+    myfile << "Time Allgather:," << horovod_global.time_allgather << ",microseconds"<< "\n";
+    myfile << "Message size," << "count," << "Total time"<< '\n';
+    for (itr = horovod_global.map_allgather.begin(); itr != horovod_global.map_allgather.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\n'; 
+        myfile  << itr->first << ',' << itr->second << '\n';
+    }
+
+    printf("Counter gather: %d\n",horovod_global.counter_gather);
+    myfile << "Counter gather:," << horovod_global.counter_gather << "\n";
+
+    printf("Time gather: %d microseconds\n",horovod_global.time_gather);
+    std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
+    myfile << "Time gather:," << horovod_global.time_gather << ",microseconds"<< "\n";
+    myfile << "Message size," << "count," << "Total time"<< '\n';
+    for (itr = horovod_global.map_gather.begin(); itr != horovod_global.map_gather.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\n'; 
+        myfile  << itr->first << ',' << itr->second << '\n';
+    }
+
+    printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
+    myfile << "Counter gatherv:," << horovod_global.counter_gatherv << "\n";
+
+    printf("Time gatherv: %d microseconds\n",horovod_global.time_gatherv);
+    std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
+    myfile << "Time gatherv:," << horovod_global.time_gatherv << ",microseconds" << "\n";
+    myfile << "Message size," << "count," << "Total time"<< '\n';
+    for (itr = horovod_global.map_gatherv.begin(); itr != horovod_global.map_gatherv.end(); ++itr) { 
+        std::cout << '\t' << itr->first 
+             << '\t' << itr->second << '\n'; 
+        myfile  << itr->first << ',' << itr->second << '\n';
+    }
   }
-
-
-  printf("Counter all reduce(nccl): %d\n",horovod_global.counter_allreduce_nccl);
-  myfile << "Counter all reduce(nccl):," << horovod_global.counter_allreduce_nccl << "\n";
-
-  printf("Time all reduce(nccl): %d microseconds\n",horovod_global.time_allreduce_nccl);
-  myfile << "Time all reduce(nccl):," << horovod_global.time_allreduce_nccl << ",microseconds"<< "\n";
-  std::cout << "\tMessage size\t" << "count\t" << "Time per call\t" << "Total time"<< '\n';
-  myfile << "Message size," << "count," << "Time per call," << "Total time"<< '\n';
-  for (itr = horovod_global.map_allreduce_nccl.begin(); itr != horovod_global.map_allreduce_nccl.end(); ++itr) { 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\t' << horovod_global.time_map_allreduce_nccl[itr->first]/itr->second << '\t' << horovod_global.time_map_allreduce_nccl[itr->first] << '\n'; 
-      myfile  << itr->first << ',' << itr->second << ',' << horovod_global.time_map_allreduce_nccl[itr->first]/itr->second <<',' << horovod_global.time_map_allreduce_nccl[itr->first]<<'\n';
-  }
-
-  printf("Counter bcast: %d\n",horovod_global.counter_bcast);
-  myfile << "Counter bcast:," << horovod_global.counter_bcast << "\n";
-
-  printf("Time Bcast: %d microseconds\n",horovod_global.time_bcast);
-  std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
-  myfile << "Time Bcast:," << horovod_global.time_bcast << ",microseconds"<< "\n";
-  myfile << "Message size," << "count," << "Total time"<< '\n';
-  for (itr = horovod_global.map_bcast.begin(); itr != horovod_global.map_bcast.end(); ++itr) { 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\n'; 
-      myfile  << itr->first << ',' << itr->second << '\n';
-  }
-
-  printf("Counter all gather: %d\n",horovod_global.counter_allgather);
-  myfile << "Counter all gather:," << horovod_global.counter_allgather << "\n";
-
-  printf("Time Allgather: %d microseconds\n",horovod_global.time_allgather);
-  std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
-  myfile << "Time Allgather:," << horovod_global.time_allgather << ",microseconds"<< "\n";
-  myfile << "Message size," << "count," << "Total time"<< '\n';
-  for (itr = horovod_global.map_allgather.begin(); itr != horovod_global.map_allgather.end(); ++itr) { 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\n'; 
-      myfile  << itr->first << ',' << itr->second << '\n';
-  }
-
-  printf("Counter gather: %d\n",horovod_global.counter_gather);
-  myfile << "Counter gather:," << horovod_global.counter_gather << "\n";
-
-  printf("Time gather: %d microseconds\n",horovod_global.time_gather);
-  std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
-  myfile << "Time gather:," << horovod_global.time_gather << ",microseconds"<< "\n";
-  myfile << "Message size," << "count," << "Total time"<< '\n';
-  for (itr = horovod_global.map_gather.begin(); itr != horovod_global.map_gather.end(); ++itr) { 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\n'; 
-      myfile  << itr->first << ',' << itr->second << '\n';
-  }
-
-  printf("Counter gatherv: %d\n",horovod_global.counter_gatherv);
-  myfile << "Counter gatherv:," << horovod_global.counter_gatherv << "\n";
-
-  printf("Time gatherv: %d microseconds\n",horovod_global.time_gatherv);
-  std::cout << "\tMessage size\t" << "count\t"  << "Total time"<< '\n';
-  myfile << "Time gatherv:," << horovod_global.time_gatherv << ",microseconds" << "\n";
-  myfile << "Message size," << "count," << "Total time"<< '\n';
-  for (itr = horovod_global.map_gatherv.begin(); itr != horovod_global.map_gatherv.end(); ++itr) { 
-      std::cout << '\t' << itr->first 
-           << '\t' << itr->second << '\n'; 
-      myfile  << itr->first << ',' << itr->second << '\n';
-  }
-
 }
 
 // Once a tensor is ready to be reduced, the coordinator sends a Response
@@ -1951,6 +1972,9 @@ void horovod_shutdown() {
 
       write_to_file();
       myfile.close();
+    }
+    else{
+      write_to_file();
     }
   MPI_Barrier(mpi_context.GetMPICommunicator(Communicator::GLOBAL));
   if (horovod_global.background_thread.joinable()) {
