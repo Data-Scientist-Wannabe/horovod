@@ -67,8 +67,14 @@ Status MPIAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Respo
 
   // Do allreduce.
   timeline.ActivityStartAll(entries, MPI_ALLREDUCE);
-  const void* sendbuf = entries.size() > 1 || first_entry.tensor->data() == first_entry.output->data()
+  if(global_state_->padding_algo>0){
+  const void* sendbuf = entries.size() > 0 || first_entry.tensor->data() == first_entry.output->data()
                         ? MPI_IN_PLACE : first_entry.tensor->data();
+  }
+  else{
+    const void* sendbuf = entries.size() > 1 || first_entry.tensor->data() == first_entry.output->data()
+                        ? MPI_IN_PLACE : first_entry.tensor->data();
+  }
 
   global_state_->counter_allreduce = global_state_->counter_allreduce + 1;
   std::map<int,int>::iterator it;
