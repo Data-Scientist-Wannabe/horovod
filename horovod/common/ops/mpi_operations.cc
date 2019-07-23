@@ -21,6 +21,24 @@
 namespace horovod {
 namespace common {
 
+  unsigned int nextPowerOf2(unsigned int n)  
+{  
+    unsigned count = 0;  
+      
+    // First n in the below condition  
+    // is for the case where n is 0  
+    if (n && !(n & (n - 1)))  
+        return n;  
+      
+    while( n != 0)  
+    {  
+        n >>= 1;  
+        count += 1;  
+    }  
+      
+    return 1 << count;  
+}
+
 MPIAllreduce::MPIAllreduce(MPIContext* mpi_context, HorovodGlobalState* global_state)
     : AllreduceOp(global_state), mpi_context_(mpi_context) {}
 
@@ -33,10 +51,14 @@ Status MPIAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Respo
 
   // Copy memory into the fusion buffer.
   auto& timeline = global_state_->timeline;
-  if (entries.size() > 1) {
+  if (entries.size() > 1 || global_state_->padding_algo>0) {
     timeline.ActivityStartAll(entries, MEMCPY_IN_FUSION_BUFFER);
     const void* fused_input_data;
     MemcpyInFusionBuffer(entries, fused_input_data, buffer_data, buffer_len);
+
+    if(global_state_->padding_algo==1){
+      num_elements = nextPowerOf2((int)num_elements);
+    }
     timeline.ActivityEndAll(entries);
   } else {
     buffer_data = (void*) first_entry.output->data();

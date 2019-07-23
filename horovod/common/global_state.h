@@ -138,6 +138,8 @@ struct HorovodGlobalState {
   int time_gather=0;
   int time_gatherv=0;
 
+  int padding_algo=0;
+
 
 
   // COMM_WORLD ranks of processes running on this node.

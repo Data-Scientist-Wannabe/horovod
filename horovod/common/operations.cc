@@ -1186,6 +1186,14 @@ void BackgroundThreadLoop(HorovodGlobalState& state, MPIContext& ctx) {
     state.param_manager.SetTensorFusionThresholdBytes(threshold, true);
   }
 
+  auto padding_patch = std::getenv(PADDING_ALGO);
+  if ( padding_patch != nullptr) {
+    horovod_global.padding_algo=std::stoi(padding_patch);
+  }
+  else{
+    horovod_global.padding_algo=0;
+  }
+
   // Override the cycle time.
   state.param_manager.SetCycleTimeMs(5);
   auto horovod_cycle_time = std::getenv(HOROVOD_CYCLE_TIME);
