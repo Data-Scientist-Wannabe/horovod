@@ -54,9 +54,11 @@ Status MPIAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Respo
   if (entries.size() > 1 || global_state_->padding_algo>0) {
     timeline.ActivityStartAll(entries, MEMCPY_IN_FUSION_BUFFER);
     const void* fused_input_data;
+    //std::cout<<"Number of elements "<<num_elements<<" "<<entries.size()<<"\n";
     MemcpyInFusionBuffer(entries, fused_input_data, buffer_data, buffer_len);
 
     if(global_state_->padding_algo==1){
+      //std::cout<<num_elements<<"\n";
       num_elements = nextPowerOf2((int)num_elements);
     }
     timeline.ActivityEndAll(entries);
@@ -67,12 +69,13 @@ Status MPIAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Respo
 
   // Do allreduce.
   timeline.ActivityStartAll(entries, MPI_ALLREDUCE);
+  const void* sendbuf;
   if(global_state_->padding_algo>0){
-  const void* sendbuf = entries.size() > 0 || first_entry.tensor->data() == first_entry.output->data()
+  sendbuf = entries.size() > 0 || first_entry.tensor->data() == first_entry.output->data()
                         ? MPI_IN_PLACE : first_entry.tensor->data();
   }
   else{
-    const void* sendbuf = entries.size() > 1 || first_entry.tensor->data() == first_entry.output->data()
+    sendbuf = entries.size() > 1 || first_entry.tensor->data() == first_entry.output->data()
                         ? MPI_IN_PLACE : first_entry.tensor->data();
   }
 
@@ -115,7 +118,7 @@ Status MPIAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Respo
   timeline.ActivityEndAll(entries);
 
   // Copy memory out of the fusion buffer.
-  if (entries.size() > 1) {
+  if (entries.size() > 1 || global_state_->padding_algo>=1) {
     timeline.ActivityStartAll(entries, MEMCPY_OUT_FUSION_BUFFER);
     MemcpyOutFusionBuffer(buffer_data, entries);
     timeline.ActivityEndAll(entries);
