@@ -20,6 +20,24 @@
 namespace horovod {
 namespace common {
 
+  unsigned int nextPowerOf2_nccl(unsigned int n)  
+{  
+    unsigned count = 0;  
+      
+    // First n in the below condition  
+    // is for the case where n is 0  
+    if (n && !(n & (n - 1)))  
+        return n;  
+      
+    while( n != 0)  
+    {  
+        n >>= 1;  
+        count += 1;  
+    }  
+      
+    return 1 << count;  
+} 
+
 ncclDataType_t GetNCCLDataType(const std::shared_ptr<Tensor> tensor) {
   switch (tensor->dtype()) {
     case HOROVOD_INT32:
@@ -70,12 +88,20 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
   void* buffer_data;
   size_t buffer_len;
 
+  int64_t num_elements = 0;
+  for (auto& e : entries) {
+    num_elements += e.tensor->shape().num_elements();
+  }
   // Copy memory into the fusion buffer.
-  if (entries.size() > 1) {
+  if (entries.size() > 1 || global_state_->padding_algo>0) {
     MemcpyInFusionBuffer(entries, fused_input_data, buffer_data, buffer_len);
 
     if (global_state_->timeline.Initialized()) {
       cuda_context_->RecordEvent(event_queue_, MEMCPY_IN_FUSION_BUFFER, *stream_);
+
+    }
+    if(global_state_->padding_algo==1){
+      num_elements = nextPowerOf2_nccl((int)num_elements);
     }
   } else {
     fused_input_data = first_entry.tensor->data();
@@ -83,10 +109,7 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
     buffer_len = (size_t) first_entry.output->size();
   }
 
-  int64_t num_elements = 0;
-  for (auto& e : entries) {
-    num_elements += e.tensor->shape().num_elements();
-  }
+
 
   // Do allreduce.
   global_state_->counter_allreduce_nccl = global_state_->counter_allreduce_nccl + 1;
@@ -116,7 +139,7 @@ Status NCCLAllreduce::Execute(std::vector<TensorTableEntry>& entries, const Resp
   }
 
   // Copy memory out of the fusion buffer.
-  if (entries.size() > 1) {
+  if (entries.size() > 1 || global_state_->padding_algo>0) {
     MemcpyOutFusionBuffer(buffer_data, entries);
 
     if (global_state_->timeline.Initialized()) {
